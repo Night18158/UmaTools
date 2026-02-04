@@ -26,6 +26,10 @@ DELAY = 0.25
 RETRIES = 3
 NAV_TIMEOUT = 45
 JS_TIMEOUT  = 45
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+)
 
 JSON_LOCK = threading.Lock()
 THUMB_LOCK = threading.Lock()
@@ -41,6 +45,82 @@ def _read_json_list(path: str) -> List[Any]:
             return data if isinstance(data, list) else []
     except json.JSONDecodeError:
         return []
+
+def _stable_key(value: Any) -> str:
+    if isinstance(value, (dict, list)):
+        try:
+            return json.dumps(value, sort_keys=True, ensure_ascii=False)
+        except TypeError:
+            return str(value)
+    return str(value)
+
+def _pluck(d: Dict[str, Any], dotted: str) -> Any:
+    cur: Any = d
+    for part in dotted.split("."):
+        cur = cur.get(part, None) if isinstance(cur, dict) else None
+    return cur
+
+class JsonListStore:
+    def __init__(self, path: str, dedup_key: Optional[Tuple[str, ...]] = None,
+                 match_key: Optional[str] = None, flush_every: int = 0):
+        self.path = path
+        self.dedup_key = dedup_key
+        self.match_key = match_key
+        self.flush_every = max(0, int(flush_every or 0))
+        self.lock = threading.Lock()
+        self.data: List[Any] = _read_json_list(path)
+        self._dedup: set[Tuple[str, ...]] = set()
+        self._index: Dict[str, int] = {}
+        self._dirty = 0
+
+        if self.dedup_key:
+            for item in self.data:
+                if isinstance(item, dict):
+                    self._dedup.add(self._make_dedup_key(item))
+
+        if self.match_key:
+            for i, item in enumerate(self.data):
+                if isinstance(item, dict) and item.get(self.match_key) is not None:
+                    self._index[str(item.get(self.match_key))] = i
+
+    def _make_dedup_key(self, item: Dict[str, Any]) -> Tuple[str, ...]:
+        return tuple(_stable_key(_pluck(item, k)) for k in (self.dedup_key or ()))
+
+    def _maybe_flush(self) -> None:
+        if self.flush_every and self._dirty >= self.flush_every:
+            _atomic_write(self.path, self.data)
+            self._dirty = 0
+
+    def append(self, item: Dict[str, Any]) -> bool:
+        with self.lock:
+            if self.dedup_key:
+                key = self._make_dedup_key(item)
+                if key in self._dedup:
+                    return False
+                self._dedup.add(key)
+            self.data.append(item)
+            self._dirty += 1
+            self._maybe_flush()
+            return True
+
+    def upsert(self, match_value: str, patch: Dict[str, Any]) -> None:
+        if not self.match_key:
+            raise ValueError("JsonListStore.upsert requires match_key")
+        key = str(match_value)
+        with self.lock:
+            idx = self._index.get(key)
+            if idx is not None and idx < len(self.data) and isinstance(self.data[idx], dict):
+                self.data[idx].update(patch)
+            else:
+                self.data.append({self.match_key: match_value, **patch})
+                self._index[key] = len(self.data) - 1
+            self._dirty += 1
+            self._maybe_flush()
+
+    def write(self) -> None:
+        with self.lock:
+            _atomic_write(self.path, self.data)
+            self._dirty = 0
 
 def _load_skill_name_map() -> Dict[str, str]:
     global _SKILL_NAME_MAP
@@ -82,24 +162,28 @@ def _atomic_write(path: str, data: List[Any]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
-def append_json_item(path: str, item: Dict[str, Any], dedup_key: Optional[Tuple[str, ...]] = None) -> bool:
+def append_json_item(path_or_store: str | JsonListStore, item: Dict[str, Any],
+                     dedup_key: Optional[Tuple[str, ...]] = None) -> bool:
+    if isinstance(path_or_store, JsonListStore):
+        return path_or_store.append(item)
+    path = path_or_store
     with JSON_LOCK:
         data = _read_json_list(path)
         if dedup_key:
-            def pluck(d: Dict[str, Any], dotted: str) -> Any:
-                cur: Any = d
-                for part in dotted.split("."):
-                    cur = cur.get(part, None) if isinstance(cur, dict) else None
-                return cur
-            probe = tuple(str(pluck(item, k)) for k in dedup_key)
+            probe = tuple(_stable_key(_pluck(item, k)) for k in dedup_key)
             for existing in data:
-                if tuple(str(pluck(existing, k)) for k in dedup_key) == probe:
+                if tuple(_stable_key(_pluck(existing, k)) for k in dedup_key) == probe:
                     return False
         data.append(item)
         _atomic_write(path, data)
         return True
 
-def upsert_json_item(path: str, match_key: str, match_value: str, patch: Dict[str, Any]) -> None:
+def upsert_json_item(path_or_store: str | JsonListStore, match_key: str, match_value: str,
+                     patch: Dict[str, Any]) -> None:
+    if isinstance(path_or_store, JsonListStore):
+        path_or_store.upsert(match_value, patch)
+        return
+    path = path_or_store
     with JSON_LOCK:
         data = _read_json_list(path)
         for obj in data:
@@ -254,6 +338,15 @@ def _abs_url(driver, src: str) -> str:
     if src.startswith("/"): return origin + src
     return origin + "/" + src
 
+def _normalize_url(url: str, origin: str = "https://gametora.com") -> str:
+    if not url:
+        return ""
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("/"):
+        return origin + url
+    return origin + "/" + url
+
 def _slug_and_id_from_url(url: str) -> tuple[str, Optional[str]]:
     path = urlparse(url).path.rstrip("/")
     parts = [p for p in path.split("/") if p]
@@ -282,19 +375,46 @@ def _save_thumb(url: str, thumbs_dir: str, slug: Optional[str], sup_id: Optional
     dest = Path(thumbs_dir) / fname
     with THUMB_LOCK:
         if not dest.exists() or dest.stat().st_size == 0:
-            try:
-                r = requests.get(url, timeout=20)
-                r.raise_for_status()
-                dest.write_bytes(r.content)
-                time.sleep(0.05)  # be polite
-            except Exception as e:
-                print(f"[thumb] failed {url}: {e}")
+            last_err: Optional[Exception] = None
+            for attempt in range(RETRIES + 1):
+                try:
+                    r = requests.get(url, timeout=20, headers={"User-Agent": USER_AGENT})
+                    r.raise_for_status()
+                    dest.write_bytes(r.content)
+                    time.sleep(0.05)  # be polite
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    time.sleep(0.4 * (2 ** attempt))
+            if last_err:
+                print(f"[thumb] failed {url}: {last_err}")
                 return ""
     # return site-relative path for the front-end
     rel = "/" + str(dest.as_posix()).lstrip("/")
     # normalize to your site’s assets folder form:
     rel = rel.replace("//", "/")
     return rel
+
+def collect_support_previews_from_items(items: List[Any], thumbs_dir: str) -> dict[str, dict]:
+    previews: dict[str, dict] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        slug = str(item.get("slug") or item.get("slug_en") or item.get("name_slug") or "").strip()
+        sid = item.get("id") or item.get("support_id") or item.get("supportId") or item.get("sid")
+        sid = str(sid) if sid is not None else ""
+        img = item.get("image") or item.get("img") or item.get("thumb") or item.get("icon") or item.get("card_img")
+        if not img:
+            continue
+        src = _normalize_url(str(img))
+        local = _save_thumb(src, thumbs_dir, slug or None, sid or None)
+        info = {"SupportImage": local or src, "SupportId": sid or _id_from_img_src(src)}
+        if slug:
+            previews[slug] = info
+        if sid:
+            previews[sid] = info
+    return previews
 
 def collect_support_previews(driver, thumbs_dir: str) -> dict[str, dict]:
     previews: dict[str, dict] = {}
@@ -310,7 +430,11 @@ def collect_support_previews(driver, thumbs_dir: str) -> dict[str, dict]:
         img = safe_find(a, By.CSS_SELECTOR, "img[src*='/images/umamusume/supports/']")
         src = _abs_url(driver, img.get_attribute("src") or "") if img else ""
         local = _save_thumb(src, thumbs_dir, slug, sid)
-        previews[slug] = {"SupportImage": local or src, "SupportId": sid or _id_from_img_src(src)}
+        info = {"SupportImage": local or src, "SupportId": sid or _id_from_img_src(src)}
+        if slug:
+            previews[slug] = info
+        if sid:
+            previews[str(sid)] = info
     return previews
 
 
@@ -340,9 +464,7 @@ def new_driver(headless: bool = True) -> webdriver.Chrome:
         opts.add_argument("--headless=new")
     opts.add_argument("--window-size=1920,1080")
 
-    opts.add_argument(
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-    )
+    opts.add_argument(f"--user-agent={USER_AGENT}")
 
     # Force SwiftShader / software GPU (Chrome 139+)
     opts.add_argument("--enable-unsafe-swiftshader")
@@ -409,6 +531,15 @@ def txt(el) -> str:
     try: return (el.get_attribute("innerText") or "").strip().replace("\u00a0", " ")
     except Exception: return ""
 
+def wait_for_next_data(driver, timeout: int = 8) -> bool:
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: d.execute_script("return !!document.getElementById('__NEXT_DATA__');")
+        )
+        return True
+    except Exception:
+        return False
+
 def extract_next_data(driver) -> Optional[Dict[str, Any]]:
     """Extract __NEXT_DATA__ JSON from the page (Next.js data)."""
     try:
@@ -434,9 +565,27 @@ def extract_next_data(driver) -> Optional[Dict[str, Any]]:
 
 def get_page_props(driver) -> Optional[Dict[str, Any]]:
     """Get pageProps from __NEXT_DATA__."""
+    # Fast path: Next.js exposes window.__NEXT_DATA__
+    try:
+        data = driver.execute_script("return window.__NEXT_DATA__ || null;")
+        if isinstance(data, dict):
+            props = data.get("props", {}).get("pageProps", {})
+            return props if isinstance(props, dict) else None
+    except Exception:
+        pass
     data = extract_next_data(driver)
     if data:
-        return data.get("props", {}).get("pageProps", {})
+        props = data.get("props", {}).get("pageProps", {})
+        return props if isinstance(props, dict) else None
+    return None
+
+def safe_get_page_props(driver, attempts: int = 2) -> Optional[Dict[str, Any]]:
+    for i in range(max(1, attempts)):
+        wait_for_next_data(driver, timeout=6 + i * 3)
+        props = get_page_props(driver)
+        if props:
+            return props
+        time.sleep(0.2 + i * 0.2)
     return None
 
 def _format_stat_rewards(rewards: List[Any]) -> str:
@@ -513,6 +662,72 @@ def _scroll_page_until_stable(driver, max_rounds: int = 10, delay: float = 0.2) 
         driver.execute_script("window.scrollTo(0, 0);")
     except Exception:
         pass
+
+def _extract_items_by_keys(page_props: Optional[Dict[str, Any]], keys: Tuple[str, ...]) -> List[Dict[str, Any]]:
+    if not isinstance(page_props, dict):
+        return []
+    for key in keys:
+        v = page_props.get(key)
+        if isinstance(v, list):
+            return v
+    data = page_props.get("data")
+    if isinstance(data, dict):
+        for key in keys:
+            v = data.get(key)
+            if isinstance(v, list):
+                return v
+    return []
+
+def _collect_urls_from_items(items: List[Any], builder) -> List[str]:
+    urls: List[str] = []
+    seen: set[str] = set()
+    for item in items:
+        url = builder(item)
+        if url and url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
+
+def _is_character_profile_url(url: str) -> bool:
+    if not url:
+        return False
+    return "/umamusume/characters/profiles" in url
+
+def _build_support_url(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    for key in ("url", "link", "href", "path"):
+        if item.get(key):
+            return _normalize_url(str(item.get(key)))
+    slug = item.get("slug") or item.get("slug_en") or item.get("name_slug") or ""
+    item_id = item.get("id") or item.get("support_id") or item.get("supportId") or item.get("sid")
+    if slug:
+        if "/" in str(slug):
+            return _normalize_url(str(slug))
+        if item_id:
+            return f"https://gametora.com/umamusume/supports/{item_id}-{slug}"
+        return f"https://gametora.com/umamusume/supports/{slug}"
+    if item_id:
+        return f"https://gametora.com/umamusume/supports/{item_id}"
+    return ""
+
+def _build_character_url(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    for key in ("url", "link", "href", "path"):
+        if item.get(key):
+            return _normalize_url(str(item.get(key)))
+    slug = item.get("slug") or item.get("slug_en") or item.get("name_slug") or ""
+    item_id = item.get("id") or item.get("chara_id") or item.get("character_id") or item.get("uma_id")
+    if slug:
+        if "/" in str(slug):
+            return _normalize_url(str(slug))
+        if item_id:
+            return f"https://gametora.com/umamusume/characters/{item_id}-{slug}"
+        return f"https://gametora.com/umamusume/characters/{slug}"
+    if item_id:
+        return f"https://gametora.com/umamusume/characters/{item_id}"
+    return ""
 
 def _collect_support_card_anchors(driver) -> List[Any]:
     anchors: List[Any] = []
@@ -892,57 +1107,154 @@ def with_retries(func, *args, **kwargs):
     return None
 
 
+def _looks_like_event_entry(obj: Any) -> bool:
+    if not isinstance(obj, dict):
+        return False
+    return any(k in obj for k in ("n", "name", "c", "choices", "r", "rewards"))
+
+def _pick_event_lang_data(event_data: Any, lang: str) -> Any:
+    if not isinstance(event_data, dict):
+        return event_data
+    for key in (lang, lang.split("-")[0], "en", "ja", "jp"):
+        if key in event_data:
+            return event_data.get(key)
+    return event_data
+
+def _iter_event_lists(lang_data: Any) -> List[List[Any]]:
+    lists: List[List[Any]] = []
+    if isinstance(lang_data, list):
+        return [lang_data]
+    if isinstance(lang_data, dict):
+        # Common container key
+        for key in ("events", "event", "eventData", "event_data"):
+            val = lang_data.get(key)
+            if isinstance(val, list):
+                return [val]
+        for val in lang_data.values():
+            if isinstance(val, list) and any(_looks_like_event_entry(x) for x in val):
+                lists.append(val)
+        if _looks_like_event_entry(lang_data):
+            lists.append([lang_data])
+    return lists
+
+def _format_event_rewards(rewards: Any) -> str:
+    if rewards is None:
+        return ""
+    if isinstance(rewards, list):
+        return _format_stat_rewards(rewards)
+    if isinstance(rewards, dict):
+        return _format_stat_rewards([rewards])
+    if isinstance(rewards, str):
+        return rewards.strip()
+    return str(rewards)
+
 def _parse_events_from_json(event_data: Dict[str, Any], lang: str = "en") -> List[Dict[str, Any]]:
-    """Parse events from the new JSON structure (wchoice, nochoice, version, outings, secret)."""
+    """Parse events from JSON, auto-detecting categories and lists."""
     events: List[Dict[str, Any]] = []
     if not event_data:
         return events
 
-    # Get the language-specific data
-    lang_data = event_data.get(lang) or event_data.get("en") or event_data.get("ja") or {}
+    lang_data = _pick_event_lang_data(event_data, lang)
+    event_lists = _iter_event_lists(lang_data)
+    if not event_lists and isinstance(event_data, dict):
+        event_lists = _iter_event_lists(event_data)
 
-    # If lang_data is not a dict (might be string or other), try event_data directly
-    if not isinstance(lang_data, dict):
-        lang_data = event_data if isinstance(event_data, dict) else {}
-
-    # Process different event categories
-    for category in ["wchoice", "nochoice", "version", "outings", "secret", "random", "arrows"]:
-        cat_events = lang_data.get(category, []) if isinstance(lang_data, dict) else []
+    for cat_events in event_lists:
         if not isinstance(cat_events, list):
             continue
-
         for evt in cat_events:
             if not isinstance(evt, dict):
                 continue
 
-            event_name = evt.get("n") or evt.get("name") or ""
+            event_name = evt.get("n") or evt.get("name") or evt.get("title") or ""
             if not event_name:
                 continue
 
-            choices = evt.get("c") or evt.get("choices") or []
+            choices = (
+                evt.get("c")
+                or evt.get("choices")
+                or evt.get("opts")
+                or evt.get("options")
+                or []
+            )
+            if isinstance(choices, dict):
+                choices = [{"name": k, "rewards": v} for k, v in choices.items()]
+
             if not choices:
-                # No-choice event - just record the rewards
-                rewards = evt.get("r") or evt.get("rewards") or []
-                reward_str = _format_stat_rewards(rewards)
+                rewards = (
+                    evt.get("r")
+                    or evt.get("rewards")
+                    or evt.get("reward")
+                    or evt.get("effects")
+                    or evt.get("stats")
+                    or []
+                )
+                reward_str = _format_event_rewards(rewards)
                 events.append({
                     "EventName": event_name,
                     "EventOptions": {"(Auto)": reward_str or "See details"}
                 })
             else:
-                # Event with choices
                 for choice in choices:
                     if isinstance(choice, dict):
-                        choice_name = choice.get("n") or choice.get("name") or "Option"
-                        rewards = choice.get("r") or choice.get("rewards") or []
-                        reward_str = _format_stat_rewards(rewards)
+                        choice_name = (
+                            choice.get("n")
+                            or choice.get("name")
+                            or choice.get("label")
+                            or choice.get("text")
+                            or "Option"
+                        )
+                        rewards = (
+                            choice.get("r")
+                            or choice.get("rewards")
+                            or choice.get("reward")
+                            or choice.get("effects")
+                            or choice.get("stats")
+                            or []
+                        )
+                        reward_str = _format_event_rewards(rewards)
                         events.append({
                             "EventName": event_name,
                             "EventOptions": {choice_name: reward_str or "See details"}
                         })
+                    elif isinstance(choice, str):
+                        events.append({
+                            "EventName": event_name,
+                            "EventOptions": {choice: "See details"}
+                        })
 
     return events
 
-def _parse_character_events_from_page(d) -> List[Dict[str, Any]]:
+def _event_entry_key(ev: Dict[str, Any]) -> Tuple[str, str]:
+    name = (ev.get("EventName") or "").strip().lower()
+    opts = ev.get("EventOptions") or {}
+    opt_name = ""
+    if isinstance(opts, dict) and opts:
+        opt_name = str(next(iter(opts.keys()))).strip().lower()
+    return (name, opt_name)
+
+def _merge_event_entries(json_events: List[Dict[str, Any]],
+                         dom_events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not dom_events:
+        return json_events
+    if not json_events:
+        return dom_events
+    merged: List[Dict[str, Any]] = []
+    pos: Dict[Tuple[str, str], int] = {}
+    for ev in json_events:
+        key = _event_entry_key(ev)
+        pos[key] = len(merged)
+        merged.append(ev)
+    for ev in dom_events:
+        key = _event_entry_key(ev)
+        if key in pos:
+            merged[pos[key]] = ev
+        else:
+            pos[key] = len(merged)
+            merged.append(ev)
+    return merged
+
+def _parse_event_helper_events_from_page(d) -> List[Dict[str, Any]]:
     events: List[Dict[str, Any]] = []
     # Try the same event helper list used on support pages
     lists = safe_find_all(d, By.CSS_SELECTOR, 'div[class*=eventhelper_elist]')
@@ -1030,7 +1342,7 @@ def _merge_support_hints(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]
             by_name[key] = h
     return list(by_name.values())
 
-def _open_character_events_tab(d) -> bool:
+def _open_events_tab(d) -> bool:
     def _click_text(label: str) -> bool:
         xpath = ("//*[self::button or self::a or self::div or self::span]"
                  "[contains(translate(normalize-space(.),"
@@ -1062,6 +1374,9 @@ def _open_character_events_tab(d) -> bool:
         return False
 
     return _click_text("events") or _click_text("event")
+
+def _open_character_events_tab(d) -> bool:
+    return _open_events_tab(d)
 
 def _parse_objectives_from_json(objective_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Parse objectives from the new JSON structure."""
@@ -1248,47 +1563,54 @@ def _parse_sizes_from_item(item_data: Dict[str, Any]) -> Dict:
         return {"B": item_data["bust"], "W": item_data["waist"], "H": item_data["hip"]}
     return {}
 
-def scrape_characters(save_path: str, server: str, headless: bool = True):
+def scrape_characters(save_path: str, server: str, headless: bool = True,
+                      events_source: str = "merge"):
+    store = JsonListStore(save_path, match_key="UmaKey", flush_every=20)
+    events_source = (events_source or "merge").lower()
     d = new_driver(headless=headless)
     try:
         with_retries(nav, d, "https://gametora.com/umamusume/characters", "body")
         ensure_server(d, server=server, keep_raw_en=True)
         time.sleep(1)  # Wait for page to fully load
 
-        # Find character links - use broader selector since classes are hashed
-        anchors = safe_find_all(d, By.CSS_SELECTOR, "a[href*='/umamusume/characters/']")
-        anchors = filter_visible(d, anchors)
-        urls = []
-        for a in anchors:
-            href = a.get_attribute("href") or ""
-            # Filter out the main list page and duplicates
-            if href and "/umamusume/characters/" in href and href != "https://gametora.com/umamusume/characters" and href not in urls:
-                # Make sure it's a specific character page (has ID in URL)
-                if re.search(r'/characters/\d+-', href) or re.search(r'/characters/[a-z]+-[a-z]+', href):
+        page_props = safe_get_page_props(d)
+        items = _extract_items_by_keys(page_props, ("items", "characters", "umas", "charas", "list"))
+        urls = _collect_urls_from_items(items, _build_character_url) if items else []
+        urls = [u for u in urls if not _is_character_profile_url(u)]
+
+        if not urls:
+            _scroll_page_until_stable(d)
+            time.sleep(0.5)
+            anchors = safe_find_all(d, By.CSS_SELECTOR, "a[href*='/umamusume/characters/']")
+            anchors = filter_visible(d, anchors)
+            seen = set()
+            for a in anchors:
+                href = a.get_attribute("href") or ""
+                if not href:
+                    continue
+                if re.search(r"/umamusume/characters/?$", href):
+                    continue
+                if _is_character_profile_url(href):
+                    continue
+                if "/umamusume/characters/" in href and href not in seen:
+                    seen.add(href)
                     urls.append(href)
 
-        urls = list(dict.fromkeys(urls))  # Remove duplicates while preserving order
-        urls = list(reversed(urls))
+        urls = list(dict.fromkeys(urls))
         total = len(urls)
 
         if total == 0:
-            print("[character] No character links found; trying to scroll and reload...")
-            _scroll_page_until_stable(d)
-            time.sleep(1)
-            anchors = safe_find_all(d, By.CSS_SELECTOR, "a[href*='/umamusume/characters/']")
-            anchors = filter_visible(d, anchors)
-            for a in anchors:
-                href = a.get_attribute("href") or ""
-                if href and "/umamusume/characters/" in href and "characters" != href.split("/")[-1] and href not in urls:
-                    urls.append(href)
-            urls = list(dict.fromkeys(urls))
-            total = len(urls)
+            print("[character] No character links found; site layout may have changed.")
+            return
 
         print(f"[character] Found {total} character URLs to scrape")
 
         for i, url in enumerate(urls, 1):
             for attempt in range(RETRIES + 1):
                 try:
+                    if _is_character_profile_url(url):
+                        print(f"[{i}/{total}] UMA skip non-character page: {url}")
+                        break
                     ok = with_retries(nav, d, url, "body")
                     slug, uma_id = _slug_and_id_from_url(url)
                     if not ok: raise TimeoutException("no body")
@@ -1296,7 +1618,7 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
                     time.sleep(0.5)  # Wait for JS to load
 
                     # Try to get data from __NEXT_DATA__ JSON first
-                    page_props = get_page_props(d)
+                    page_props = safe_get_page_props(d)
 
                     if page_props:
                         # New JSON-based extraction
@@ -1306,6 +1628,9 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
                             or page_props.get("events")
                             or page_props.get("event")
                             or page_props.get("event_data")
+                            or item_data.get("eventData")
+                            or item_data.get("events")
+                            or item_data.get("event")
                             or {}
                         )
                         objective_data = page_props.get("objectiveData", [])
@@ -1348,10 +1673,17 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
                         objectives = _parse_objectives_from_json(objective_data)
 
                         # Parse events
-                        events = _parse_events_from_json(event_data, lang="en")
-                        if not events:
-                            _open_character_events_tab(d)
-                            events = _parse_character_events_from_page(d)
+                        events_json = _parse_events_from_json(event_data, lang="en") if event_data else []
+                        events_dom: List[Dict[str, Any]] = []
+                        if events_source in ("dom", "merge") or (events_source == "json" and not events_json):
+                            _open_events_tab(d)
+                            events_dom = _parse_event_helper_events_from_page(d)
+                        if events_source == "dom":
+                            events = events_dom or events_json
+                        elif events_source == "merge":
+                            events = _merge_event_entries(events_json, events_dom) if events_dom else events_json
+                        else:
+                            events = events_json or events_dom
 
                     else:
                         # Fallback to old DOM-based parsing (may not work with new UI)
@@ -1371,10 +1703,15 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
                         height_cm = _parse_height_from_page(d)
                         sizes = _parse_three_sizes(_label_value(d, "Three sizes") or _label_value(d, "Three Sizes"))
                         objectives = []
-                        events = []
+                        events_json = []
+                        events_dom: List[Dict[str, Any]] = []
+                        if events_source in ("dom", "merge") or events_source == "json":
+                            _open_events_tab(d)
+                            events_dom = _parse_event_helper_events_from_page(d)
+                        events = events_dom or events_json
 
                     # --- Upsert record ---
-                    upsert_json_item(save_path, "UmaKey", uma_key, {
+                    upsert_json_item(store, "UmaKey", uma_key, {
                         "UmaKey": uma_key,
                         "UmaName": name,
                         "UmaNickname": nickname or None,
@@ -1407,6 +1744,9 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
                     else:
                         print(f"[{i}/{total}] UMA ERROR {url}: {e}")
                         break
+
+        store.write()
+        _summarize_characters(store)
     finally:
         try: d.quit()
         except Exception: pass
@@ -1414,7 +1754,8 @@ def scrape_characters(save_path: str, server: str, headless: bool = True):
 
 def scrape_supports(out_events_path: str, out_hints_path: str, server: str, headless: bool = True,
                     thumbs_dir: str = "assets/support_thumbs", workers: int = 2,
-                    min_interval: float = 0.9, jitter: float = 0.25):
+                    min_interval: float = 0.9, jitter: float = 0.25,
+                    events_source: str = "merge"):
     return scrape_supports_threaded(
         out_events_path,
         out_hints_path,
@@ -1423,7 +1764,8 @@ def scrape_supports(out_events_path: str, out_hints_path: str, server: str, head
         thumbs_dir=thumbs_dir,
         workers=workers,
         min_interval=min_interval,
-        jitter=jitter
+        jitter=jitter,
+        events_source=events_source
     )
     d = new_driver(headless=headless)
     try:
@@ -1539,51 +1881,8 @@ def scrape_supports(out_events_path: str, out_hints_path: str, server: str, head
 
 
 def _parse_support_events_from_json(event_data: Dict[str, Any], lang: str = "en") -> List[Dict[str, Any]]:
-    """Parse support card events from JSON (random events and chain/arrow events)."""
-    events: List[Dict[str, Any]] = []
-    if not event_data:
-        return events
-
-    # Get language-specific data
-    lang_data = event_data.get(lang) or event_data.get("en") or event_data.get("ja") or {}
-    if not isinstance(lang_data, dict):
-        lang_data = event_data if isinstance(event_data, dict) else {}
-
-    # Process random events and arrows (chain events)
-    for category in ["random", "arrows", "chain"]:
-        cat_events = lang_data.get(category, []) if isinstance(lang_data, dict) else []
-        if not isinstance(cat_events, list):
-            continue
-
-        for evt in cat_events:
-            if not isinstance(evt, dict):
-                continue
-
-            event_name = evt.get("n") or evt.get("name") or ""
-            if not event_name:
-                continue
-
-            choices = evt.get("c") or evt.get("choices") or []
-            if not choices:
-                # No-choice event
-                rewards = evt.get("r") or evt.get("rewards") or []
-                reward_str = _format_stat_rewards(rewards)
-                events.append({
-                    "EventName": event_name,
-                    "EventOptions": {"(Auto)": reward_str or "See details"}
-                })
-            else:
-                for choice in choices:
-                    if isinstance(choice, dict):
-                        choice_name = choice.get("n") or choice.get("name") or "Option"
-                        rewards = choice.get("r") or choice.get("rewards") or []
-                        reward_str = _format_stat_rewards(rewards)
-                        events.append({
-                            "EventName": event_name,
-                            "EventOptions": {choice_name: reward_str or "See details"}
-                        })
-
-    return events
+    """Parse support card events from JSON (all categories)."""
+    return _parse_events_from_json(event_data, lang=lang)
 
 def _parse_support_hints_from_json(item_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Parse support hints/skills from JSON."""
@@ -1593,15 +1892,32 @@ def _parse_support_hints_from_json(item_data: Dict[str, Any]) -> List[Dict[str, 
     if not hints_data:
         return hints
 
-    # hint_skills is a list of skill IDs
+    # hint_skills may be list of IDs or objects
     name_map = _load_skill_name_map()
     hint_skills = hints_data.get("hint_skills", [])
-    for skill_id in hint_skills:
-        sid = str(skill_id)
+    for skill_entry in hint_skills:
+        lvl = None
+        if isinstance(skill_entry, dict):
+            sid = (
+                skill_entry.get("id")
+                or skill_entry.get("skill_id")
+                or skill_entry.get("skillId")
+                or skill_entry.get("sid")
+            )
+            lvl = (
+                skill_entry.get("hint_level")
+                or skill_entry.get("hint_lv")
+                or skill_entry.get("level")
+            )
+        else:
+            sid = skill_entry
+        sid = str(sid) if sid is not None else ""
+        if not sid:
+            continue
         hints.append({
             "SkillId": sid,
             "Name": name_map.get(sid, ""),
-            "HintLevel": None
+            "HintLevel": int(lvl) if isinstance(lvl, (int, float, str)) and str(lvl).isdigit() else None
         })
 
     # hint_others contains stat bonuses like "Speed +6"
@@ -1615,28 +1931,42 @@ def _parse_support_hints_from_json(item_data: Dict[str, Any]) -> List[Dict[str, 
             })
         elif isinstance(other, dict):
             name = other.get("name") or other.get("n") or other.get("label") or ""
+            lvl = other.get("hint_level") or other.get("hint_lv") or other.get("level")
             if name:
                 hints.append({
                     "SkillId": "",
                     "Name": name,
-                    "HintLevel": None
+                    "HintLevel": int(lvl) if isinstance(lvl, (int, float, str)) and str(lvl).isdigit() else None
                 })
 
     return hints
 
 def _scrape_support_detail(d, url: str, previews: dict, thumbs_dir: str,
-                           out_events_path: str, out_hints_path: str) -> tuple[str, str, Optional[str], int, int]:
+                           events_store: JsonListStore, hints_store: JsonListStore,
+                           events_source: str = "merge") -> tuple[str, str, Optional[str], int, int]:
     slug, sup_id = _slug_and_id_from_url(url)
 
     time.sleep(0.3)  # Wait for page to load
 
     # Try to get data from __NEXT_DATA__ JSON first
-    page_props = get_page_props(d)
+    page_props = safe_get_page_props(d)
+    events_source = (events_source or "merge").lower()
+    events_json: List[Dict[str, Any]] = []
+    events_dom: List[Dict[str, Any]] = []
 
     if page_props:
         # New JSON-based extraction
         item_data = page_props.get("itemData", {})
-        event_data = page_props.get("eventData", {})
+        event_data = (
+            page_props.get("eventData")
+            or page_props.get("events")
+            or page_props.get("event")
+            or page_props.get("event_data")
+            or item_data.get("eventData")
+            or item_data.get("events")
+            or item_data.get("event")
+            or {}
+        )
 
         # Get support card name
         sname = item_data.get("name_en") or item_data.get("name") or ""
@@ -1667,7 +1997,7 @@ def _scrape_support_detail(d, url: str, previews: dict, thumbs_dir: str,
             hints = _merge_support_hints(hints, dom_hints)
 
         # Parse events from JSON
-        events = _parse_support_events_from_json(event_data, lang="en")
+        events_json = _parse_events_from_json(event_data, lang="en") if event_data else []
 
     else:
         # Fallback to DOM-based parsing
@@ -1681,14 +2011,27 @@ def _scrape_support_detail(d, url: str, previews: dict, thumbs_dir: str,
 
         _open_support_hints_tab(d)
         hints = parse_support_hints_on_page(d)
-        events = []
+        events_json = []
+
+    # Optional DOM event parsing for completeness
+    if events_source in ("dom", "merge") or (events_source == "json" and not events_json):
+        _open_events_tab(d)
+        events_dom = _parse_event_helper_events_from_page(d)
+
+    if events_source == "dom":
+        events = events_dom or events_json
+    elif events_source == "merge":
+        events = _merge_event_entries(events_json, events_dom) if events_dom else events_json
+    else:
+        events = events_json or events_dom
 
     # Handle image
     img_url = ""
-    if slug in previews:
-        img_url = previews[slug].get("SupportImage", "") or ""
+    preview = previews.get(slug) or (sup_id and previews.get(str(sup_id)))
+    if preview:
+        img_url = preview.get("SupportImage", "") or ""
         if not sup_id:
-            sup_id = previews[slug].get("SupportId", None)
+            sup_id = preview.get("SupportId", None)
     if not img_url:
         big = safe_find(d, By.CSS_SELECTOR, "img[src*='/images/umamusume/supports/']")
         src = _abs_url(d, big.get_attribute("src") or "") if big else ""
@@ -1697,15 +2040,13 @@ def _scrape_support_detail(d, url: str, previews: dict, thumbs_dir: str,
     # Save events
     added = 0
     for evt in events:
-        if append_json_item(
-            out_events_path,
-            make_support_card(evt["EventName"], evt["EventOptions"]),
-            dedup_key=("EventName", "EventOptions")
-        ):
+        if not isinstance(evt, dict):
+            continue
+        if append_json_item(events_store, evt, dedup_key=("EventName", "EventOptions")):
             added += 1
 
     # Upsert hints
-    upsert_json_item(out_hints_path, "SupportSlug", slug or sname, {
+    upsert_json_item(hints_store, "SupportSlug", slug or sname, {
         "SupportSlug": slug or sname,
         "SupportId": sup_id,
         "SupportName": sname,
@@ -1719,53 +2060,52 @@ def _scrape_support_detail(d, url: str, previews: dict, thumbs_dir: str,
 
 def scrape_supports_threaded(out_events_path: str, out_hints_path: str, server: str, headless: bool = True,
                              thumbs_dir: str = "assets/support_thumbs", workers: int = 2,
-                             min_interval: float = 0.9, jitter: float = 0.25) -> None:
+                             min_interval: float = 0.9, jitter: float = 0.25,
+                             events_source: str = "merge") -> None:
+    events_store = JsonListStore(out_events_path, dedup_key=("EventName", "EventOptions"), flush_every=100)
+    hints_store = JsonListStore(out_hints_path, match_key="SupportSlug", flush_every=25)
     d = new_driver(headless=headless)
     try:
         with_retries(nav, d, "https://gametora.com/umamusume/supports", "body")
         ensure_server(d, server=server, keep_raw_en=True)
         time.sleep(1)  # Wait for JS to load
 
-        # collect preview thumbnails by slug/id once
-        previews = collect_support_previews(d, thumbs_dir)
+        page_props = safe_get_page_props(d)
+        items = _extract_items_by_keys(page_props, ("items", "supports", "supportCards", "support_cards", "supportList"))
+        previews = collect_support_previews_from_items(items, thumbs_dir) if items else {}
+        urls = _collect_urls_from_items(items, _build_support_url) if items else []
 
-        # Scroll to load all cards
-        _scroll_page_until_stable(d)
-        time.sleep(0.5)
-
-        cards = _wait_support_cards(d)
-        if not cards:
+        if not urls:
+            # Scroll to load all cards
             _scroll_page_until_stable(d)
-            cards = _wait_support_cards(d, timeout_s=4.0)
+            time.sleep(0.5)
 
-        urls = []
-        seen = set()
-        for a in cards:
-            href = a.get_attribute("href") or ""
-            if href and href not in seen:
-                # Validate it's a specific support page
-                if re.search(r'/supports/\d+-', href):
+            cards = _wait_support_cards(d)
+            if not cards:
+                _scroll_page_until_stable(d)
+                cards = _wait_support_cards(d, timeout_s=4.0)
+
+            urls = []
+            seen = set()
+            for a in cards:
+                href = a.get_attribute("href") or ""
+                if not href:
+                    continue
+                if re.search(r"/umamusume/supports/?$", href):
+                    continue
+                if "/umamusume/supports/" in href and href not in seen:
                     seen.add(href)
                     urls.append(href)
 
-        # Also try to get URLs from __NEXT_DATA__ if available
-        if not urls:
-            page_props = get_page_props(d)
-            if page_props:
-                items = page_props.get("items") or page_props.get("supports") or []
-                for item in items:
-                    if isinstance(item, dict):
-                        item_id = item.get("id") or item.get("support_id")
-                        slug = item.get("slug") or ""
-                        if item_id:
-                            url = f"https://gametora.com/umamusume/supports/{item_id}-{slug}" if slug else f"https://gametora.com/umamusume/supports/{item_id}"
-                            if url not in seen:
-                                seen.add(url)
-                                urls.append(url)
+        if not previews:
+            previews = collect_support_previews(d, thumbs_dir)
 
         total = len(urls)
         if total == 0:
             print("[support] No support cards found on list page; site layout may have changed.")
+            events_store.write()
+            hints_store.write()
+            _summarize_supports(events_store, hints_store)
             return
 
         print(f"[support] Found {total} support card URLs to scrape")
@@ -1797,7 +2137,7 @@ def scrape_supports_threaded(out_events_path: str, out_hints_path: str, server: 
                             if not ok:
                                 raise TimeoutException("no body")
                             sname, slug, sup_id, added, hint_count = _scrape_support_detail(
-                                d_local, url, previews, thumbs_dir, out_events_path, out_hints_path
+                                d_local, url, previews, thumbs_dir, events_store, hints_store, events_source
                             )
                             print(f"[{idx}/{total}] SUPPORT {sname} (slug:{slug or '-'} id:{sup_id or '-'} "
                                   f"+{added} events, {hint_count} hints)")
@@ -1830,8 +2170,13 @@ def scrape_supports_threaded(out_events_path: str, out_hints_path: str, server: 
     for t in threads:
         t.join()
 
+    events_store.write()
+    hints_store.write()
+    _summarize_supports(events_store, hints_store)
+
 
 def scrape_career(save_path: str, server: str, headless: bool = True):
+    store = JsonListStore(save_path, dedup_key=("EventName", "EventOptions"), flush_every=100)
     d = new_driver(headless=headless)
     try:
         with_retries(nav, d, "https://gametora.com/umamusume/training-event-helper", "body")
@@ -1904,13 +2249,14 @@ def scrape_career(save_path: str, server: str, headless: bool = True):
                     pop = tippy_show_and_get_popper(d, it)
                     try:
                         for kv in parse_event_from_tippy_popper(pop):
-                            if append_json_item(save_path, make_career(name, kv),
-                                                dedup_key=("EventName", "EventOptions")):
+                            if append_json_item(store, make_career(name, kv)):
                                 added += 1
                     finally:
                         tippy_hide(d, it)
 
                 print(f"[{idx + 1}/{total}] CAREER +{added} rows")
+        store.write()
+        _summarize_career(store)
     finally:
         try: d.quit()
         except Exception: pass
@@ -1929,6 +2275,7 @@ def _parse_schedule(year_label: str, month_label: str) -> str:
     return f"{year_text} {month_text}"
 
 def scrape_races(save_path: str, server: str, headless: bool = True):
+    store = JsonListStore(save_path, dedup_key=("RaceName", "Schedule", "DistanceMeter"), flush_every=100)
     d = new_driver(headless=headless)
     try:
         with_retries(nav, d, "https://gametora.com/umamusume/races", "body")
@@ -1972,7 +2319,7 @@ def scrape_races(save_path: str, server: str, headless: bool = True):
                     race_name, "Junior Year Pre-Debut", "Pre Debut",
                     "Varies", "Varies", "Varies", "Varies", "Varies", "Varies"
                 )
-                append_json_item(save_path, item, dedup_key=("RaceName", "Schedule", "DistanceMeter"))
+                append_json_item(store, item)
                 print(f"[{idx}/{total}] {race_name} (special) ✓")
                 continue
 
@@ -2058,13 +2405,39 @@ def scrape_races(save_path: str, server: str, headless: bool = True):
                 distance_type or "Unknown", distance_meter or "Unknown", season_text or "Unknown",
                 fans_required or "Unknown", fans_gained or "Unknown"
             )
-            append_json_item(save_path, item, dedup_key=("RaceName", "Schedule", "DistanceMeter"))
+            append_json_item(store, item)
 
             print(f"[{idx}/{total}] {race_name} ✓")
+        store.write()
+        _summarize_races(store)
     finally:
         try: d.quit()
         except Exception: pass
 
+
+def _summarize_supports(events_store: JsonListStore, hints_store: JsonListStore) -> None:
+    events = events_store.data if events_store else []
+    hints = hints_store.data if hints_store else []
+    hints_total = sum(len(h.get("SupportHints", [])) for h in hints if isinstance(h, dict))
+    no_hints = sum(1 for h in hints if isinstance(h, dict) and not h.get("SupportHints"))
+    no_images = sum(1 for h in hints if isinstance(h, dict) and not h.get("SupportImage"))
+    print(f"[summary] Supports: {len(hints)} cards, {hints_total} hints, {len(events)} events, "
+          f"{no_hints} with 0 hints, {no_images} without image")
+
+def _summarize_characters(store: JsonListStore) -> None:
+    data = store.data if store else []
+    no_events = sum(1 for h in data if isinstance(h, dict) and not h.get("UmaEvents"))
+    no_objectives = sum(1 for h in data if isinstance(h, dict) and not h.get("UmaObjectives"))
+    print(f"[summary] Characters: {len(data)} total, {no_events} with 0 events, {no_objectives} with 0 objectives")
+
+def _summarize_career(store: JsonListStore) -> None:
+    data = store.data if store else []
+    print(f"[summary] Career events: {len(data)} rows")
+
+def _summarize_races(store: JsonListStore) -> None:
+    data = store.data if store else []
+    unique_names = {h.get("RaceName") for h in data if isinstance(h, dict) and h.get("RaceName")}
+    print(f"[summary] Races: {len(data)} rows, {len(unique_names)} unique names")
 
 def main():
     ap = argparse.ArgumentParser(description="GameTora scraper (robust + accurate Support hints; UMA skills removed)")
@@ -2080,13 +2453,15 @@ def main():
     ap.add_argument("--supports-workers", type=int, default=2, help="Parallel workers for support scraping (1 disables threading)")
     ap.add_argument("--supports-min-interval", type=float, default=0.9, help="Min seconds between support page navigations across workers")
     ap.add_argument("--supports-jitter", type=float, default=0.25, help="Random jitter added to support navigation delays")
+    ap.add_argument("--events-source", choices=["json","dom","merge"], default="merge",
+                    help="Event extraction source: json=__NEXT_DATA__, dom=event helper, merge=dom overrides json")
     args = ap.parse_args()
     headless = not args.headful
 
     try:
         if args.what in ("uma","all"):
             print("\n=== Characters (objectives/events only) ===")
-            scrape_characters(args.out_uma, server=args.server, headless=headless)
+            scrape_characters(args.out_uma, server=args.server, headless=headless, events_source=args.events_source)
         if args.what in ("supports","all"):
             print("\n=== Supports (events + support hints) ===")
             scrape_supports(
@@ -2097,7 +2472,8 @@ def main():
                 thumbs_dir=args.thumb_dir,
                 workers=args.supports_workers,
                 min_interval=args.supports_min_interval,
-                jitter=args.supports_jitter
+                jitter=args.supports_jitter,
+                events_source=args.events_source
             )
         if args.what in ("career","all"):
             print("\n=== Career ===")
