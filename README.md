@@ -50,8 +50,17 @@ This app includes multiple pages. Use the top navigation or visit the routes dir
 2. Configure track, distance, and strategy aptitudes.
 3. Use **Generate Build** to auto-pick skills for selected targets.
 4. Add/edit skill rows; results update with best score and points used.
-5. Use **Copy Build** or **Load Build** to share or restore builds.
-6. Enter final stats in the **Rating Calculator** to project the final rating.
+5. Use **Save Build** to store builds locally, then **View Saved Builds** to load, share, or delete them.
+6. Use **Share Build** to copy a link that includes budget, mode, race config, and rating stats.
+7. Enter final stats in the **Rating Calculator** to project the final rating.
+8. For full rating math and skill scoring details, see `RATING_README.md`.
+
+### Calculator (Standalone Rating)
+
+1. Configure race aptitudes, then enter final stats, star rarity, and unique skill level.
+2. Add skills to compute the skill score (no cost or optimization on this page).
+3. Review projected rating and badge progress.
+4. For full rating math and skill scoring details, see `RATING_README.md`.
 
 ---
 
