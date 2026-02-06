@@ -87,6 +87,7 @@
     <link rel="stylesheet" href="/css/theme-d.build.css" />
     <link rel="stylesheet" href="/css/rating.css" />
     <link rel="stylesheet" href="/css/calculator.css" />
+    <link rel="stylesheet" href="/css/tutorial.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -223,6 +224,16 @@
 
     <main id="main" class="container">
       <h1>Rating Calculator</h1>
+      <div class="tutorial-help-row">
+        <button
+          id="tutorial-open"
+          class="btn btn-secondary tutorial-open-link"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded="false">
+          Help / Tutorial
+        </button>
+      </div>
 
       <!-- Combined Race Config + Stats/Rating -->
       <section class="card card-elevated calculator-top-section race-config-container">
@@ -390,7 +401,7 @@
       </section>
 
       <!-- Selected Skills Display -->
-      <section class="card card-elevated" style="margin-bottom:16px">
+      <section class="card card-elevated" id="selected-skills-section" style="margin-bottom:16px">
         <h3 style="margin:.2rem 0 .5rem 0">Selected Skills</h3>
         <div id="results" class="results">
           <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
@@ -437,6 +448,7 @@
     <!-- Declare routes so nav.js can render the shared navbar (like other pages) -->
     
     <script src="/js/rating-shared.js" defer></script>
+    <script src="/js/tutorial.js" defer></script>
     <script src="/js/calculator.js" defer></script>
         <script>
       window.NAV_ROUTES = [

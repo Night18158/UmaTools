@@ -749,6 +749,48 @@
     updateVisibility();
   }
 
+  function initTutorial() {
+    if (!window.UmaTutorial || !document.getElementById('tutorial-open')) return;
+    const tutorial = window.UmaTutorial.create({
+      pageKey: 'calculator',
+      openButton: '#tutorial-open',
+      panelTitle: 'Calculator quick tour',
+      steps: [
+        {
+          title: 'Quick walkthrough',
+          shortTitle: 'Quick walkthrough',
+          text: 'This tutorial is non-blocking and skippable. Re-open it any time from Help / Tutorial.',
+          target: '#tutorial-open'
+        },
+        {
+          title: 'Match race configuration',
+          shortTitle: 'Race configuration',
+          text: 'Set track, distance, and strategy affinities to match your Uma so category scoring is accurate.',
+          target: '.race-config-pane'
+        },
+        {
+          title: 'Enter stats and star level',
+          shortTitle: 'Stats and stars',
+          text: 'Fill final stats, star rarity, and unique skill level to project your true rating.',
+          target: '#rating-card'
+        },
+        {
+          title: 'Add skills to the calculator',
+          shortTitle: 'Add skills',
+          text: 'Type skills into these rows to include them in the rating calculation.',
+          target: '#rows'
+        },
+        {
+          title: 'Review selected skills and totals',
+          shortTitle: 'Selected skills',
+          text: 'See your selected skills, count, and score summary here.',
+          target: '#selected-skills-section'
+        }
+      ]
+    });
+    tutorial.init();
+  }
+
   // Initialize
   async function init() {
     // Load skills library
@@ -790,6 +832,7 @@
 
     // Initial display update
     updateSelectedSkillsDisplay();
+    initTutorial();
   }
 
   init();

@@ -3030,6 +3030,75 @@
     }
   }
 
+  function initTutorial() {
+    if (!window.UmaTutorial || !document.getElementById('tutorial-open')) return;
+    const tutorial = window.UmaTutorial.create({
+      pageKey: 'optimizer',
+      openButton: '#tutorial-open',
+      panelTitle: 'Optimizer quick tour',
+      getTokens: () => ({
+        goalLabel: optimizeModeSelect?.selectedOptions?.[0]?.textContent?.trim() || 'Rating'
+      }),
+      steps: [
+        {
+          title: 'Quick setup path',
+          shortTitle: 'Quick setup path',
+          text: 'This lightweight tour is skippable and re-openable any time from this Help / Tutorial button.',
+          target: '#tutorial-open'
+        },
+        {
+          title: 'Add your skill points',
+          shortTitle: 'Skill points',
+          text: 'Set your available skill points budget here. Recommendations and remaining points use this value.',
+          target: '#budget'
+        },
+        {
+          title: 'Use Fast Learner when needed',
+          shortTitle: 'Fast Learner toggle',
+          text: 'Turn this on if your Uma has reduced skill costs. Skill costs update automatically.',
+          target: '#fast-learner'
+        },
+        {
+          title: 'Optimize for {goalLabel}',
+          shortTitle: 'Optimize for goal',
+          text: 'Choose the selected goal or category. Current mode is {goalLabel}, and you can switch any time.',
+          target: '#optimize-mode'
+        },
+        {
+          title: 'Match race affinities',
+          shortTitle: 'Race configuration',
+          text: 'Set track, distance, and strategy to match your Uma. Affinities change how skills are scored.',
+          target: '#optimizer-race-config .race-config-pane'
+        },
+        {
+          title: 'Use the skill builder',
+          shortTitle: 'Skill builder',
+          text: 'Generate Build auto-picks strong rating skills for your selected categories, then you can fine-tune rows.',
+          target: '#optimizer-skill-builder'
+        },
+        {
+          title: 'Enter stats and star level',
+          shortTitle: 'Stats and stars',
+          text: 'Input final stats, star rarity, and unique level so projected rating matches your Uma.',
+          target: '#rating-card'
+        },
+        {
+          title: 'Add skills to the optimizer',
+          shortTitle: 'Add skills',
+          text: 'Type skills in these rows. Type and category are detected, and costs update with your settings.',
+          target: '#rows'
+        },
+        {
+          title: 'Find your Skills to Buy',
+          shortTitle: 'Skills to Buy',
+          text: 'Your recommended purchase list appears here once rows are filled. This is where to read final picks.',
+          target: '#skills-to-buy-section'
+        }
+      ]
+    });
+    tutorial.init();
+  }
+
   function finishInit() {
     const hadURL = readFromURL();
     if (!hadURL) {
@@ -3049,6 +3118,7 @@
     refreshAllRowCosts();
     ensureOneEmptyRow();
     autoOptimizeDebounced();
+    initTutorial();
   }
 
   // Init: prefer CSV by default

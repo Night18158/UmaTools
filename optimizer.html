@@ -93,6 +93,7 @@
     <link rel="stylesheet" href="/css/theme-d.build.css" />
     <link rel="stylesheet" href="/css/rating.css" />
     <link rel="stylesheet" href="/css/optimizer.css" />
+    <link rel="stylesheet" href="/css/tutorial.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -360,9 +361,19 @@
 
     <main id="main" class="container">
       <h1>Skill Optimizer</h1>
+      <div class="tutorial-help-row">
+        <button
+          id="tutorial-open"
+          class="btn btn-secondary tutorial-open-link"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded="false">
+          Help / Tutorial
+        </button>
+      </div>
 
       <!-- Budget + library status -->
-      <section class="card card-elevated">
+      <section class="card card-elevated" id="optimizer-budget-section">
         <div class="toolbar toolbar-centered" style="align-items:center">
           <label class="labelTitle" style="min-width:220px">
             Skill Points Budget
@@ -385,7 +396,7 @@
       </section>
 
       <!-- Race configuration + Ideal builder -->
-      <section class="card card-elevated race-config-container" aria-labelledby="raceConfigTitle">
+      <section class="card card-elevated race-config-container" id="optimizer-race-config" aria-labelledby="raceConfigTitle">
         <div class="race-card-grid">
           <div class="race-config-pane">
             <div class="race-card-header">
@@ -482,7 +493,7 @@
               </div>
             </div>
           </div>
-          <div class="ideal-builder-pane">
+          <div class="ideal-builder-pane" id="optimizer-skill-builder">
             <div class="ideal-header">
               <h3 id="autoBuilderTitle">Ideal Skill Builder</h3>
               <p class="muted">Pick the aptitudes you care about &mdash; matching rows will be highlighted.</p>
@@ -607,8 +618,8 @@
       </section>
 
       <!-- Results -->
-      <section class="card card-elevated" style="margin-bottom:16px">
-        <h3 style="margin:.2rem 0 .5rem 0">Results</h3>
+      <section class="card card-elevated" id="skills-to-buy-section" style="margin-bottom:16px">
+        <h3 style="margin:.2rem 0 .5rem 0">Skills to Buy</h3>
         <div id="results" class="results">
           <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
             <div class="pill"><b>Best Score:</b> <span id="best-score">0</span></div>
@@ -701,6 +712,7 @@
     <!-- Declare routes so nav.js can render the shared navbar (like other pages) -->
     
     <script src="/js/rating-shared.js" defer></script>
+    <script src="/js/tutorial.js" defer></script>
     <script src="/js/optimizer.js" defer></script>
         <script>
       window.NAV_ROUTES = [
