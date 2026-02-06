@@ -163,14 +163,8 @@
 
     function applyBadgeSpriteStyles(target, spriteUrl, sheetWidth, sheetHeight) {
       if (!target) return;
-      const badgeWidth = target.clientWidth || RATING_SPRITE.tileWidth;
-      const badgeHeight = target.clientHeight || RATING_SPRITE.tileHeight;
-      const scaleX = badgeWidth / RATING_SPRITE.tileWidth;
-      const scaleY = badgeHeight / RATING_SPRITE.tileHeight;
-      const bgWidth = sheetWidth * scaleX;
-      const bgHeight = sheetHeight * scaleY;
       target.style.backgroundImage = `url(${spriteUrl})`;
-      target.style.backgroundSize = `${bgWidth}px ${bgHeight}px`;
+      target.style.backgroundSize = `${RATING_SPRITE.columns * 100}% ${RATING_SPRITE.rows * 100}%`;
     }
 
     function loadRatingSprite() {
@@ -243,11 +237,11 @@
     function updateBadgeSprite(target, badge) {
       if (!target) return;
       if (RATING_SPRITE.loaded && badge.sprite) {
-        const badgeWidth = target.clientWidth || RATING_SPRITE.tileWidth;
-        const badgeHeight = target.clientHeight || RATING_SPRITE.tileHeight;
-        const offsetX = badge.sprite.col * badgeWidth;
-        const offsetY = badge.sprite.row * badgeHeight;
-        target.style.backgroundPosition = `-${offsetX}px -${offsetY}px`;
+        const cols = RATING_SPRITE.columns;
+        const rows = RATING_SPRITE.rows;
+        const x = cols > 1 ? (badge.sprite.col / (cols - 1)) * 100 : 0;
+        const y = rows > 1 ? (badge.sprite.row / (rows - 1)) * 100 : 0;
+        target.style.backgroundPosition = `${x}% ${y}%`;
         target.textContent = '';
       } else {
         target.style.backgroundImage = 'none';
