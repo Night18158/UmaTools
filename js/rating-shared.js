@@ -161,10 +161,18 @@
       return RATING_BADGES.length - 1;
     }
 
-    function applyBadgeSpriteStyles(target, spriteUrl, sheetWidth, sheetHeight) {
+    function syncBadgeSpriteMetrics(target) {
+      if (!target) return { badgeWidth: RATING_SPRITE.tileWidth, badgeHeight: RATING_SPRITE.tileHeight };
+      const badgeWidth = target.clientWidth || RATING_SPRITE.tileWidth;
+      const badgeHeight = target.clientHeight || RATING_SPRITE.tileHeight;
+      target.style.backgroundSize = `${badgeWidth * RATING_SPRITE.columns}px ${badgeHeight * RATING_SPRITE.rows}px`;
+      return { badgeWidth, badgeHeight };
+    }
+
+    function applyBadgeSpriteStyles(target, spriteUrl) {
       if (!target) return;
       target.style.backgroundImage = `url(${spriteUrl})`;
-      target.style.backgroundSize = `${RATING_SPRITE.columns * 100}% ${RATING_SPRITE.rows * 100}%`;
+      syncBadgeSpriteMetrics(target);
     }
 
     function loadRatingSprite() {
@@ -179,8 +187,8 @@
         RATING_SPRITE.tileWidth = sheetWidth / RATING_SPRITE.columns;
         RATING_SPRITE.tileHeight = sheetHeight / RATING_SPRITE.rows;
         RATING_SPRITE.loaded = true;
-        applyBadgeSpriteStyles(ratingDisplays.badgeSprite, spriteUrl, sheetWidth, sheetHeight);
-        applyBadgeSpriteStyles(ratingDisplays.floatBadgeSprite, spriteUrl, sheetWidth, sheetHeight);
+        applyBadgeSpriteStyles(ratingDisplays.badgeSprite, spriteUrl);
+        applyBadgeSpriteStyles(ratingDisplays.floatBadgeSprite, spriteUrl);
         updateRatingDisplay();
       };
       img.onerror = () => {
@@ -237,11 +245,10 @@
     function updateBadgeSprite(target, badge) {
       if (!target) return;
       if (RATING_SPRITE.loaded && badge.sprite) {
-        const cols = RATING_SPRITE.columns;
-        const rows = RATING_SPRITE.rows;
-        const x = cols > 1 ? (badge.sprite.col / (cols - 1)) * 100 : 0;
-        const y = rows > 1 ? (badge.sprite.row / (rows - 1)) * 100 : 0;
-        target.style.backgroundPosition = `${x}% ${y}%`;
+        const { badgeWidth, badgeHeight } = syncBadgeSpriteMetrics(target);
+        const offsetX = badge.sprite.col * badgeWidth;
+        const offsetY = badge.sprite.row * badgeHeight;
+        target.style.backgroundPosition = `-${offsetX}px -${offsetY}px`;
         target.textContent = '';
       } else {
         target.style.backgroundImage = 'none';
