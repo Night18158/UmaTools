@@ -21,8 +21,10 @@ Usage:
     print(f"Platform: {result.meta['source']}")
 """
 
+import os
+import tempfile
 import time
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -34,6 +36,7 @@ except ImportError:
 
 from .color_detect import detect_red_badge
 from .constants import COST_UPSCALE_FACTOR, SKILL_POINTS_CONFIG
+from .debug import annotate_frame, dump_row_crops, save_debug_output
 from .field_ocr import ocr_cost_digits, ocr_hint_badge, ocr_skill_name
 from .layout import detect_layout
 from .row_parser import get_roi_crop, segment_rows
@@ -432,11 +435,17 @@ def extract_visible_skills(
     if frame is None or frame.size == 0:
         result.meta["error"] = "Invalid frame: None or empty"
         result.meta["timing"] = time.time() - start_time
+        if debug:
+            result.meta["debug"] = True
+            result.meta["debug_paths"] = {"debug_error": "Cannot generate debug for invalid frame"}
         return result
 
     if len(frame.shape) != 3:
         result.meta["error"] = "Invalid frame: expected 3-channel color image"
         result.meta["timing"] = time.time() - start_time
+        if debug:
+            result.meta["debug"] = True
+            result.meta["debug_paths"] = {"debug_error": "Cannot generate debug for non-3-channel frame"}
         return result
 
     height, width, channels = frame.shape
@@ -448,6 +457,9 @@ def extract_visible_skills(
     if layout is None:
         result.meta["error"] = "Layout detection failed"
         result.meta["timing"] = time.time() - start_time
+        if debug:
+            result.meta["debug"] = True
+            result.meta["debug_paths"] = _generate_debug_output(frame, result)
         return result
 
     result.meta["source"] = layout.platform
@@ -470,6 +482,9 @@ def extract_visible_skills(
     if layout.list_bbox is None:
         result.meta["warning"] = "No skill list detected"
         result.meta["timing"] = time.time() - start_time
+        if debug:
+            result.meta["debug"] = True
+            result.meta["debug_paths"] = _generate_debug_output(frame, result)
         return result
 
     # Segment rows
@@ -485,6 +500,9 @@ def extract_visible_skills(
     if not rows:
         result.meta["warning"] = "No skill rows detected"
         result.meta["timing"] = time.time() - start_time
+        if debug:
+            result.meta["debug"] = True
+            result.meta["debug_paths"] = _generate_debug_output(frame, result)
         return result
 
     # Get skill matcher
@@ -502,9 +520,68 @@ def extract_visible_skills(
     end_time = time.time()
     result.meta["timing"] = end_time - start_time
 
-    # Debug mode placeholder - will be implemented in subtask-9-3
+    # Debug mode: generate annotated output and row crops
     if debug:
         result.meta["debug"] = True
-        # Debug visualization will be added later
+        debug_paths = _generate_debug_output(frame, result)
+        result.meta["debug_paths"] = debug_paths
 
     return result
+
+
+def _generate_debug_output(
+    frame: np.ndarray,
+    result: SkillOcrResult,
+    output_dir: Optional[str] = None,
+) -> Dict[str, str]:
+    """
+    Generate debug output including annotated frame and row crops.
+
+    Creates a debug output directory (either specified or a temp directory)
+    and saves:
+    - Annotated frame with bboxes and extracted values
+    - Text summary of results
+    - Individual row crops for debugging OCR issues
+
+    Args:
+        frame: BGR image (numpy array)
+        result: SkillOcrResult from extraction
+        output_dir: Optional directory path for debug output.
+                   If None, creates a temp directory.
+
+    Returns:
+        Dict mapping output type to file path:
+        - "output_dir": Base output directory path
+        - "annotated": Path to annotated image
+        - "summary": Path to summary text file
+        - "row_crops": List of paths to row crop images
+    """
+    paths: Dict[str, str] = {}
+
+    # Create output directory
+    if output_dir is None:
+        # Create a temp directory for debug output
+        output_dir = tempfile.mkdtemp(prefix="ocr_debug_")
+
+    paths["output_dir"] = output_dir
+
+    try:
+        # Save annotated frame and summary
+        saved = save_debug_output(frame, result, output_dir)
+        if "annotated" in saved:
+            paths["annotated"] = saved["annotated"]
+        if "summary" in saved:
+            paths["summary"] = saved["summary"]
+
+        # Save row crops
+        crops_dir = os.path.join(output_dir, "crops")
+        crop_paths = dump_row_crops(frame, result, crops_dir)
+        if crop_paths:
+            paths["row_crops_dir"] = crops_dir
+            paths["row_crops_count"] = str(len(crop_paths))
+
+    except Exception:
+        # Debug output is non-critical, don't fail the extraction
+        paths["debug_error"] = "Failed to generate debug output"
+
+    return paths
