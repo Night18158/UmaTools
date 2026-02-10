@@ -475,6 +475,8 @@ class VideoOptimizer:
         Apply temporal smoothing to extraction results.
 
         Replaces low-confidence readings with higher-confidence cached values.
+        This provides stable output across frames by keeping the most confident
+        reading for each field within the temporal window.
 
         Args:
             result: Raw extraction result
@@ -482,10 +484,138 @@ class VideoOptimizer:
         Returns:
             Smoothed result with more stable values
         """
-        # For now, just update trackers - smoothing will be more sophisticated
-        # in subtask-8-2
+        # First update trackers with new readings
         self._update_row_trackers(result)
-        return result
+
+        # Now apply smoothed values back to the result
+        smoothed_skills = []
+        for skill in result.skills:
+            # Find matching tracker for this skill
+            row_bbox = skill.bboxes.get("row")
+            if row_bbox is None:
+                smoothed_skills.append(skill)
+                continue
+
+            row_y = row_bbox[1]
+            tracker = self._find_matching_tracker(row_y)
+
+            if tracker is None:
+                smoothed_skills.append(skill)
+                continue
+
+            # Apply smoothed values to create a new skill entry
+            smoothed_skill = self._apply_tracker_to_skill(skill, tracker)
+            smoothed_skills.append(smoothed_skill)
+
+        # Return new result with smoothed skills
+        return SkillOcrResult(
+            skills=smoothed_skills,
+            skill_points_available=result.skill_points_available,
+            meta={
+                **result.meta,
+                "temporal_smoothing_applied": True,
+                "active_trackers": len(self._row_trackers),
+            },
+        )
+
+    def _find_matching_tracker(self, y_position: int) -> Optional[RowTracker]:
+        """
+        Find an existing tracker near the given y position.
+
+        Args:
+            y_position: Y coordinate to match
+
+        Returns:
+            Matching RowTracker or None
+        """
+        y_tolerance = 20
+
+        for tracker in self._row_trackers.values():
+            if abs(tracker.last_y_position - y_position) < y_tolerance:
+                return tracker
+
+        return None
+
+    def _apply_tracker_to_skill(
+        self,
+        skill: SkillEntry,
+        tracker: RowTracker
+    ) -> SkillEntry:
+        """
+        Apply smoothed values from a tracker to a skill entry.
+
+        Uses the higher-confidence value between the current reading
+        and the cached value from the tracker.
+
+        Args:
+            skill: Current skill entry
+            tracker: Row tracker with cached values
+
+        Returns:
+            New skill entry with smoothed values
+        """
+        # Get current values and confidences
+        current_cost = skill.cost
+        current_cost_conf = skill.confidence.get("cost", 0.0)
+
+        current_hint = skill.hint_level
+        current_hint_conf = skill.confidence.get("hint", 0.0)
+
+        current_discount = skill.discount_percent
+        current_obtained = skill.obtained
+        current_obtained_conf = skill.confidence.get("obtained", 0.0)
+
+        # Apply smoothed values if tracker has higher confidence
+        smoothed_cost = current_cost
+        smoothed_cost_conf = current_cost_conf
+        if tracker.cost is not None and tracker.cost.confidence > current_cost_conf:
+            smoothed_cost = tracker.cost.value
+            smoothed_cost_conf = tracker.cost.confidence
+
+        smoothed_hint = current_hint
+        smoothed_hint_conf = current_hint_conf
+        smoothed_discount = current_discount
+        if tracker.hint_level is not None and tracker.hint_level.confidence > current_hint_conf:
+            smoothed_hint = tracker.hint_level.value
+            smoothed_hint_conf = tracker.hint_level.confidence
+            # Also use the cached discount if we use cached hint
+            if tracker.discount_percent is not None:
+                smoothed_discount = tracker.discount_percent.value
+
+        smoothed_obtained = current_obtained
+        smoothed_obtained_conf = current_obtained_conf
+        if tracker.obtained is not None and tracker.obtained.confidence > current_obtained_conf:
+            smoothed_obtained = tracker.obtained.value
+            smoothed_obtained_conf = tracker.obtained.confidence
+
+        # Use matched skill ID from tracker if available and current doesn't have one
+        smoothed_skill_id = skill.skill_id
+        smoothed_canonical_name = skill.canonical_name
+        if smoothed_skill_id is None and tracker.skill_id is not None:
+            smoothed_skill_id = tracker.skill_id
+            smoothed_canonical_name = tracker.canonical_name
+
+        # Build updated confidence dict
+        smoothed_confidence = {
+            **skill.confidence,
+            "cost": smoothed_cost_conf,
+            "hint": smoothed_hint_conf,
+            "obtained": smoothed_obtained_conf,
+        }
+
+        # Create new skill entry with smoothed values
+        return SkillEntry(
+            name_raw=skill.name_raw,
+            name_norm=skill.name_norm,
+            skill_id=smoothed_skill_id,
+            canonical_name=smoothed_canonical_name,
+            cost=smoothed_cost,
+            hint_level=smoothed_hint,
+            discount_percent=smoothed_discount,
+            obtained=smoothed_obtained,
+            confidence=smoothed_confidence,
+            bboxes=skill.bboxes,
+        )
 
     def _update_fps(self, current_time: float):
         """Update FPS estimate based on frame timing."""
