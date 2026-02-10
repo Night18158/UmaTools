@@ -22,11 +22,18 @@ Usage:
 """
 
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
+import cv2
 import numpy as np
 
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
+
 from .color_detect import detect_red_badge
+from .constants import COST_UPSCALE_FACTOR, SKILL_POINTS_CONFIG
 from .field_ocr import ocr_cost_digits, ocr_hint_badge, ocr_skill_name
 from .layout import detect_layout
 from .row_parser import get_roi_crop, segment_rows
@@ -36,6 +43,246 @@ from .types import SkillEntry, SkillOcrResult
 
 # Singleton skill matcher instance for efficiency
 _skill_matcher: Optional[SkillMatcher] = None
+
+
+def _check_tesseract_available() -> bool:
+    """Check if pytesseract is available and configured."""
+    if pytesseract is None:
+        return False
+    try:
+        pytesseract.get_tesseract_version()
+        return True
+    except Exception:
+        return False
+
+
+def _extract_skill_points_roi(
+    frame: np.ndarray,
+    platform: str,
+) -> Optional[np.ndarray]:
+    """
+    Extract the region of interest containing skill points from the top bar.
+
+    The skill points display is typically located at the top of the screen,
+    showing "Skill Points: XXXX" or similar text with a numeric value.
+
+    Args:
+        frame: BGR image (full frame)
+        platform: Platform type ("mobile" or "pc")
+
+    Returns:
+        Cropped BGR image of skill points region, or None if invalid
+    """
+    if frame is None or frame.size == 0:
+        return None
+
+    height, width = frame.shape[:2]
+
+    # Define the top bar region based on platform
+    # Mobile: skill points typically in upper portion, centered
+    # PC: skill points typically in upper-left or upper-center
+    if platform == "mobile":
+        # Mobile: top 12% of screen, center-right area
+        y1 = int(height * 0.02)
+        y2 = int(height * 0.12)
+        x1 = int(width * 0.35)
+        x2 = int(width * 0.95)
+    else:
+        # PC: top 10% of screen, center-left area
+        y1 = int(height * 0.02)
+        y2 = int(height * 0.10)
+        x1 = int(width * 0.20)
+        x2 = int(width * 0.60)
+
+    # Ensure valid bounds
+    y1 = max(0, y1)
+    y2 = min(height, y2)
+    x1 = max(0, x1)
+    x2 = min(width, x2)
+
+    if y2 <= y1 or x2 <= x1:
+        return None
+
+    return frame[y1:y2, x1:x2].copy()
+
+
+def _preprocess_skill_points_roi(roi: np.ndarray) -> np.ndarray:
+    """
+    Preprocess the skill points ROI for OCR.
+
+    Uses digit-optimized preprocessing similar to cost OCR.
+
+    Args:
+        roi: BGR image of skill points region
+
+    Returns:
+        Preprocessed binary image ready for OCR
+    """
+    if roi is None or roi.size == 0:
+        return np.ones((50, 200), dtype=np.uint8) * 255
+
+    # Convert to grayscale
+    if len(roi.shape) == 3:
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = roi
+
+    # Upscale for better OCR accuracy
+    h, w = gray.shape[:2]
+    factor = COST_UPSCALE_FACTOR
+    upscaled = cv2.resize(gray, (w * factor, h * factor), interpolation=cv2.INTER_CUBIC)
+
+    # Apply adaptive threshold
+    binary = cv2.adaptiveThreshold(
+        upscaled,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        11,
+        2
+    )
+
+    # Morphological close to fill gaps in digits
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+    # Ensure black text on white background
+    # Check border pixels
+    border_mean = np.mean([
+        np.mean(binary[0, :]),
+        np.mean(binary[-1, :]),
+        np.mean(binary[:, 0]),
+        np.mean(binary[:, -1])
+    ])
+    if border_mean < 128:
+        binary = cv2.bitwise_not(binary)
+
+    return binary
+
+
+def _parse_skill_points(text: str) -> Optional[int]:
+    """
+    Parse skill points value from OCR text.
+
+    Looks for a sequence of digits (typically 1-9999) representing
+    the available skill points.
+
+    Args:
+        text: Raw OCR output
+
+    Returns:
+        Parsed integer value, or None if not found
+    """
+    if not text:
+        return None
+
+    # Extract all digit sequences
+    digits = ''.join(c for c in text if c.isdigit())
+
+    if not digits:
+        return None
+
+    try:
+        value = int(digits)
+        # Valid skill points range (0 to 99999)
+        if 0 <= value <= 99999:
+            return value
+        return None
+    except ValueError:
+        return None
+
+
+def _extract_skill_points_from_top_bar(
+    frame: np.ndarray,
+    platform: str,
+) -> Tuple[Optional[int], float]:
+    """
+    Extract skill points available from the top bar of the screen.
+
+    The skill points are displayed at the top of the Learn screen,
+    showing the current available points that can be spent.
+
+    Args:
+        frame: BGR image (full frame)
+        platform: Platform type ("mobile" or "pc")
+
+    Returns:
+        Tuple of (skill_points, confidence):
+        - skill_points: Integer value of available skill points, or None if not found
+        - confidence: OCR confidence score (0.0-1.0)
+    """
+    if not _check_tesseract_available():
+        return (None, 0.0)
+
+    # Extract the ROI containing skill points
+    roi = _extract_skill_points_roi(frame, platform)
+
+    if roi is None or roi.size == 0:
+        return (None, 0.0)
+
+    # Preprocess for OCR
+    preprocessed = _preprocess_skill_points_roi(roi)
+
+    try:
+        # Run OCR with digit whitelist
+        data = pytesseract.image_to_data(
+            preprocessed,
+            config=SKILL_POINTS_CONFIG,
+            output_type=pytesseract.Output.DICT
+        )
+
+        # Extract text and calculate confidence
+        texts = []
+        confidences = []
+
+        for i, text in enumerate(data['text']):
+            conf = data['conf'][i]
+            text = text.strip()
+
+            if text and conf >= 0:
+                texts.append(text)
+                confidences.append(conf)
+
+        combined_text = ''.join(texts)
+        avg_confidence = sum(confidences) / len(confidences) / 100.0 if confidences else 0.0
+
+        # Parse skill points
+        skill_points = _parse_skill_points(combined_text)
+
+        if skill_points is not None:
+            return (skill_points, avg_confidence)
+
+        # Try fallback with Otsu threshold
+        if len(roi.shape) == 3:
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = roi
+
+        h, w = gray.shape[:2]
+        factor = COST_UPSCALE_FACTOR
+        upscaled = cv2.resize(gray, (w * factor, h * factor), interpolation=cv2.INTER_CUBIC)
+        _, binary = cv2.threshold(upscaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Check polarity
+        border_mean = np.mean([
+            np.mean(binary[0, :]),
+            np.mean(binary[-1, :]),
+            np.mean(binary[:, 0]),
+            np.mean(binary[:, -1])
+        ])
+        if border_mean < 128:
+            binary = cv2.bitwise_not(binary)
+
+        alt_text = pytesseract.image_to_string(binary, config=SKILL_POINTS_CONFIG).strip()
+        alt_points = _parse_skill_points(alt_text)
+
+        if alt_points is not None:
+            return (alt_points, 0.5)
+
+        return (None, 0.0)
+
+    except Exception:
+        return (None, 0.0)
 
 
 def _get_skill_matcher() -> SkillMatcher:
@@ -169,7 +416,7 @@ def extract_visible_skills(
     Returns:
         SkillOcrResult containing:
         - skills: List of SkillEntry objects for each detected skill row
-        - skill_points_available: Not yet implemented (returns None)
+        - skill_points_available: Integer skill points from top bar, or None if not detected
         - meta: Dict with source, scale, list_bbox, timing, frame_shape, etc.
     """
     start_time = time.time()
@@ -209,6 +456,15 @@ def extract_visible_skills(
     result.meta["layout_confidence"] = layout.confidence
     result.meta["row_height_estimate"] = layout.row_height_estimate
     result.meta["plus_buttons_count"] = len(layout.plus_buttons)
+
+    # Extract skill points from top bar
+    skill_points, skill_points_conf = _extract_skill_points_from_top_bar(
+        frame,
+        layout.platform,
+    )
+    result.skill_points_available = skill_points
+    if skill_points is not None:
+        result.meta["skill_points_confidence"] = skill_points_conf
 
     # If no list bbox found, we can't segment rows
     if layout.list_bbox is None:
