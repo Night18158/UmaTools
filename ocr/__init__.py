@@ -29,9 +29,11 @@ Output:
     - SkillOcrResult containing list of SkillEntry objects and metadata
 """
 
+from .extractor import extract_visible_skills
 from .types import SkillEntry, SkillOcrResult
 
 __all__ = [
+    "extract_visible_skills",
     "SkillEntry",
     "SkillOcrResult",
 ]
