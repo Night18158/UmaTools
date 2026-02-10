@@ -161,16 +161,18 @@
       return RATING_BADGES.length - 1;
     }
 
-    function applyBadgeSpriteStyles(target, spriteUrl, sheetWidth, sheetHeight) {
-      if (!target) return;
+    function syncBadgeSpriteMetrics(target) {
+      if (!target) return { badgeWidth: RATING_SPRITE.tileWidth, badgeHeight: RATING_SPRITE.tileHeight };
       const badgeWidth = target.clientWidth || RATING_SPRITE.tileWidth;
       const badgeHeight = target.clientHeight || RATING_SPRITE.tileHeight;
-      const scaleX = badgeWidth / RATING_SPRITE.tileWidth;
-      const scaleY = badgeHeight / RATING_SPRITE.tileHeight;
-      const bgWidth = sheetWidth * scaleX;
-      const bgHeight = sheetHeight * scaleY;
+      target.style.backgroundSize = `${badgeWidth * RATING_SPRITE.columns}px ${badgeHeight * RATING_SPRITE.rows}px`;
+      return { badgeWidth, badgeHeight };
+    }
+
+    function applyBadgeSpriteStyles(target, spriteUrl) {
+      if (!target) return;
       target.style.backgroundImage = `url(${spriteUrl})`;
-      target.style.backgroundSize = `${bgWidth}px ${bgHeight}px`;
+      syncBadgeSpriteMetrics(target);
     }
 
     function loadRatingSprite() {
@@ -185,8 +187,8 @@
         RATING_SPRITE.tileWidth = sheetWidth / RATING_SPRITE.columns;
         RATING_SPRITE.tileHeight = sheetHeight / RATING_SPRITE.rows;
         RATING_SPRITE.loaded = true;
-        applyBadgeSpriteStyles(ratingDisplays.badgeSprite, spriteUrl, sheetWidth, sheetHeight);
-        applyBadgeSpriteStyles(ratingDisplays.floatBadgeSprite, spriteUrl, sheetWidth, sheetHeight);
+        applyBadgeSpriteStyles(ratingDisplays.badgeSprite, spriteUrl);
+        applyBadgeSpriteStyles(ratingDisplays.floatBadgeSprite, spriteUrl);
         updateRatingDisplay();
       };
       img.onerror = () => {
@@ -243,8 +245,7 @@
     function updateBadgeSprite(target, badge) {
       if (!target) return;
       if (RATING_SPRITE.loaded && badge.sprite) {
-        const badgeWidth = target.clientWidth || RATING_SPRITE.tileWidth;
-        const badgeHeight = target.clientHeight || RATING_SPRITE.tileHeight;
+        const { badgeWidth, badgeHeight } = syncBadgeSpriteMetrics(target);
         const offsetX = badge.sprite.col * badgeWidth;
         const offsetY = badge.sprite.row * badgeHeight;
         target.style.backgroundPosition = `-${offsetX}px -${offsetY}px`;
@@ -265,7 +266,22 @@
       const badge = getRatingBadge(breakdown.total);
       updateBadgeSprite(ratingDisplays.badgeSprite, badge);
       updateBadgeSprite(ratingDisplays.floatBadgeSprite, badge);
-      if (ratingDisplays.progressFill && ratingDisplays.nextLabel && ratingDisplays.nextNeeded) {
+      const progressTargets = [
+        {
+          label: ratingDisplays.nextLabel,
+          needed: ratingDisplays.nextNeeded,
+          fill: ratingDisplays.progressFill,
+          bar: ratingDisplays.progressBar
+        },
+        {
+          label: ratingDisplays.floatNextLabel,
+          needed: ratingDisplays.floatNextNeeded,
+          fill: ratingDisplays.floatProgressFill,
+          bar: ratingDisplays.floatProgressBar
+        }
+      ];
+      const hasProgressTarget = progressTargets.some((t) => t.fill && t.label && t.needed);
+      if (hasProgressTarget) {
         const idx = getRatingBadgeIndex(breakdown.total);
         const current = RATING_BADGES[idx];
         const prevThreshold = idx === 0 ? 0 : RATING_BADGES[idx - 1].threshold;
@@ -278,14 +294,19 @@
           : 1;
         const nextBadge = hasNext ? RATING_BADGES[idx + 1] : current;
         const needed = hasNext ? Math.max(0, nextThreshold - breakdown.total) : 0;
-        ratingDisplays.progressFill.style.width = `${Math.round(progress * 100)}%`;
-        ratingDisplays.nextLabel.textContent = hasNext
+        const labelText = hasNext
           ? `Next: ${nextBadge?.label || current.label} at ${nextThreshold}`
           : 'Max rank reached';
-        ratingDisplays.nextNeeded.textContent = hasNext ? `+${needed}` : '';
-        if (ratingDisplays.progressBar) {
-          ratingDisplays.progressBar.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
-        }
+        const neededText = hasNext ? `+${needed}` : '';
+        const width = `${Math.round(progress * 100)}%`;
+        progressTargets.forEach((target) => {
+          if (target.fill) target.fill.style.width = width;
+          if (target.label) target.label.textContent = labelText;
+          if (target.needed) target.needed.textContent = neededText;
+          if (target.bar) {
+            target.bar.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+          }
+        });
       }
     }
 

@@ -29,10 +29,13 @@
   // Build navbar element (not in DOM yet)
   const nav = document.createElement("nav");
   nav.className = "site-nav";
+  nav.setAttribute("aria-label", "Primary");
   nav.innerHTML = `
     <div class="nav-inner">
       <div class="nav-left">
-        <a class="brand" href="/" aria-label="Uma Tools Home">UmaTools</a>
+        <a class="brand" href="/" aria-label="Uma Tools Home">
+          <span class="brand-text">UmaTools</span>
+        </a>
         <button class="menu-btn" aria-label="Menu" aria-expanded="false">
           <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"
               fill="none" stroke="currentColor" stroke-width="2"
@@ -43,7 +46,6 @@
         <div class="nav-links" role="navigation" aria-label="Primary"></div>
       </div>
       <div class="nav-right">
-        <a id="navBetaBtn" class="beta-btn" aria-label="Try the beta version">Try The Beta</a>
         <div id="navModeToggleSlot"></div>
       </div>
     </div>
@@ -71,7 +73,12 @@
   // Inject everything after DOM is ready
   document.addEventListener("DOMContentLoaded", () => {
     // Put navbar at top
-    document.body.prepend(nav);
+    const skipLink = document.querySelector(".skip-link");
+    if (skipLink && skipLink.parentNode) {
+      skipLink.insertAdjacentElement("afterend", nav);
+    } else {
+      document.body.prepend(nav);
+    }
 
     // Build links
     const links = ROUTES.map((route) => {
@@ -115,14 +122,6 @@
       toggle.classList.add("in-nav");
     }
 
-    // Set beta link href based on current domain
-    var betaBtn = document.getElementById("navBetaBtn");
-    if (betaBtn) {
-      var loc = window.location;
-      var betaHost = "beta." + loc.host;
-      betaBtn.href = loc.protocol + "//" + betaHost + loc.pathname + loc.search + loc.hash;
-    }
-
     // Footer at bottom
     const footer = document.createElement("footer");
     footer.className = "site-footer";
@@ -136,8 +135,13 @@
     document.body.appendChild(footer);
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => {});
     }
+
+    // Signal that nav is ready so loaders can safely release.
+    window.dispatchEvent(new Event("nav:ready"));
   });
 
   // Close menu if switching to desktop width

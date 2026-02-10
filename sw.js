@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v14";
+const CACHE_VERSION = "v23";
 const STATIC_CACHE = `umatools-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `umatools-runtime-${CACHE_VERSION}`;
 
@@ -12,7 +12,12 @@ const STATIC_ASSETS = [
   "/calculator.html",
   "/stamina.html",
   "/umadle.html",
+  "/404.html",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/site.webmanifest",
   "/css/base.css",
+  "/css/theme-d.build.css",
   "/css/landing.css",
   "/css/events.css",
   "/css/hints.css",
@@ -22,8 +27,10 @@ const STATIC_ASSETS = [
   "/css/rating.css",
   "/css/calculator.css",
   "/css/stamina.css",
+  "/css/tutorial.css",
   "/js/nav.js",
   "/js/rating-shared.js",
+  "/js/tutorial.js",
   "/js/ocr.js",
   "/js/hints.js",
   "/js/random.js",
@@ -34,6 +41,12 @@ const STATIC_ASSETS = [
   "/js/search.js",
   "/js/recommend.js",
   "/favicon.ico",
+  "/favicon-16x16.png",
+  "/favicon-32x32.png",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/og-default.png",
   "/assets/rank_badges.png"
 ];
 
@@ -89,6 +102,10 @@ function networkFirst(request) {
     .catch(() => caches.match(request));
 }
 
+function isCodeAsset(pathname) {
+  return pathname.endsWith(".js") || pathname.endsWith(".css");
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -102,7 +119,8 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (STATIC_ASSETS.includes(url.pathname)) {
-    event.respondWith(cacheFirst(request));
+    // Keep code assets fresh without requiring hard refreshes after deploys.
+    event.respondWith(isCodeAsset(url.pathname) ? networkFirst(request) : cacheFirst(request));
     return;
   }
 

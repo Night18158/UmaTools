@@ -32,7 +32,11 @@
     nextLabel: document.getElementById('rating-next-label'),
     nextNeeded: document.getElementById('rating-next-needed'),
     progressFill: document.getElementById('rating-progress-fill'),
-    progressBar: document.querySelector('.rating-progress-bar')
+    progressBar: document.getElementById('rating-progress-bar'),
+    floatNextLabel: document.getElementById('rating-float-next-label'),
+    floatNextNeeded: document.getElementById('rating-float-next-needed'),
+    floatProgressFill: document.getElementById('rating-float-progress-fill'),
+    floatProgressBar: document.getElementById('rating-float-progress-bar')
   };
 
   // Race config selects
@@ -402,7 +406,7 @@
       </div>
       <div class="skill-cell">
         <label>Skill</label>
-        <input type="text" class="skill-name" list="skills-datalist-shared" placeholder="Start typing..." />
+        <input type="text" class="skill-name field-control" list="skills-datalist-shared" placeholder="Start typing..." />
         <div class="dup-warning" role="status" aria-live="polite"></div>
       </div>
       <div class="score-cell">
@@ -691,6 +695,102 @@
     }
   }
 
+  function initRatingFloat() {
+    const floatRoot = document.getElementById('rating-float');
+    const ratingHero = document.querySelector('.rating-hero');
+    if (!floatRoot || !ratingHero) return;
+
+    let heroState = 'visible';
+
+    if (floatRoot.parentElement !== document.body) {
+      document.body.appendChild(floatRoot);
+    }
+
+    const getHeroState = (rect) => {
+      if (!rect) return 'visible';
+      if (rect.bottom < 0) return 'above';
+      if (rect.top > window.innerHeight) return 'below';
+      return 'visible';
+    };
+
+    const updateVisibility = () => {
+      const shouldShow = heroState === 'above';
+      floatRoot.classList.toggle('is-visible', shouldShow);
+    };
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.target === ratingHero) {
+              if (entry.isIntersecting) {
+                heroState = 'visible';
+              } else {
+                heroState = entry.boundingClientRect.top < 0 ? 'above' : 'below';
+              }
+              updateVisibility();
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      observer.observe(ratingHero);
+    } else {
+      const check = () => {
+        heroState = getHeroState(ratingHero.getBoundingClientRect());
+        updateVisibility();
+      };
+      check();
+      window.addEventListener('scroll', check, { passive: true });
+      window.addEventListener('resize', check);
+    }
+
+    heroState = getHeroState(ratingHero.getBoundingClientRect());
+    updateVisibility();
+  }
+
+  function initTutorial() {
+    if (!window.UmaTutorial || !document.getElementById('tutorial-open')) return;
+    const tutorial = window.UmaTutorial.create({
+      pageKey: 'calculator',
+      openButton: '#tutorial-open',
+      panelTitle: 'Calculator quick tour',
+      steps: [
+        {
+          title: 'Quick walkthrough',
+          shortTitle: 'Quick walkthrough',
+          text: 'This tutorial is non-blocking and skippable. Re-open it any time from Help / Tutorial.',
+          target: '#tutorial-open'
+        },
+        {
+          title: 'Match race configuration',
+          shortTitle: 'Race configuration',
+          text: 'Set track, distance, and strategy affinities to match your Uma so category scoring is accurate.',
+          target: '.race-config-pane'
+        },
+        {
+          title: 'Enter stats and star level',
+          shortTitle: 'Stats and stars',
+          text: 'Fill final stats, star rarity, and unique skill level to project your true rating.',
+          target: '#rating-card'
+        },
+        {
+          title: 'Add skills to the calculator',
+          shortTitle: 'Add skills',
+          text: 'Type skills into these rows to include them in the rating calculation.',
+          target: '#rows'
+        },
+        {
+          title: 'Review selected skills and totals',
+          shortTitle: 'Selected skills',
+          text: 'See your selected skills, count, and score summary here.',
+          target: '#selected-skills-section'
+        }
+      ]
+    });
+    tutorial.init();
+  }
+
   // Initialize
   async function init() {
     // Load skills library
@@ -723,6 +823,7 @@
     // Init rating inputs
     ratingEngine.initRatingInputs();
     scheduleRatingSpriteLoad();
+    initRatingFloat();
 
     // Clear all button
     if (clearAllBtn) {
@@ -731,6 +832,7 @@
 
     // Initial display update
     updateSelectedSkillsDisplay();
+    initTutorial();
   }
 
   init();
