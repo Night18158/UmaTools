@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UmaTools - Randomizer</title>
+    <title>UmaTools - Training Planner</title>
     <meta
       name="description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Plan your Uma Musume training run with a visual 78-turn timeline."
     />
-    <link rel="canonical" href="https://daftuyda.moe/random" />
+    <link rel="canonical" href="https://daftuyda.moe/planner" />
     <meta name="robots" content="index, follow" />
     <meta
       name="theme-color"
@@ -24,12 +24,15 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="UmaTools" />
-    <meta property="og:title" content="UmaTools - Randomizer" />
+    <meta property="og:title" content="UmaTools - Training Planner" />
     <meta
       property="og:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Plan your Uma Musume training run with a visual 78-turn timeline."
     />
-    <meta property="og:url" content="https://daftuyda.moe/random" />
+    <meta
+      property="og:url"
+      content="https://daftuyda.moe/planner"
+    />
     <meta
       property="og:image"
       content="https://daftuyda.moe/og-default.png"
@@ -37,12 +40,12 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="UmaTools - Randomizer" />
+    <meta property="og:image:alt" content="UmaTools - Training Planner" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="UmaTools - Randomizer" />
+    <meta name="twitter:title" content="UmaTools - Training Planner" />
     <meta
       name="twitter:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Plan your Uma Musume training run with a visual 78-turn timeline."
     />
     <meta
       name="twitter:image"
@@ -50,7 +53,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="UmaTools - Randomizer"
+      content="UmaTools - Training Planner"
     />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link
@@ -79,64 +82,8 @@
     />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/theme-d.build.css" />
-    <link rel="stylesheet" href="/css/random.css" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://daftuyda.moe/#organization",
-            "name": "UmaTools",
-            "url": "https://daftuyda.moe/",
-            "logo": "https://daftuyda.moe/icon-512.png",
-            "sameAs": [
-              "https://github.com/daftuyda/UmaTools",
-              "https://youtube.com/@MaybeVoid"
-            ]
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://daftuyda.moe/#website",
-            "url": "https://daftuyda.moe/",
-            "name": "UmaTools",
-            "publisher": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "WebPage",
-            "@id": "https://daftuyda.moe/random#webpage",
-            "url": "https://daftuyda.moe/random",
-            "name": "Randomizer",
-            "description": "Roll random support decks and pick random Uma Musume with filters and speed options.",
-            "isPartOf": { "@id": "https://daftuyda.moe/#website" },
-            "about": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "BreadcrumbList",
-            "@id": "https://daftuyda.moe/random#breadcrumb",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://daftuyda.moe/"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Randomizer",
-                "item": "https://daftuyda.moe/random"
-              }
-            ]
-          }
-        ]
-      }
-    </script>
-    <!-- No-flash dark mode: pre-apply saved theme before paint -->
-    
-      <script defer src="/_vercel/insights/script.js"></script>
+    <link rel="stylesheet" href="/css/planner.css" />
+    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
     <script>
@@ -234,67 +181,77 @@
     </button>
 
     <main id="main" class="container">
-      <h1>Randomizer</h1>
+      <h1>Training Planner</h1>
 
-      <!-- Support Deck Randomizer -->
-      <section id="supportRandomizer" class="result">
-        <div class="choice">
-          <h3>Support Deck (5 cards)</h3>
-          <div class="toolbar" role="group" aria-label="Support filters">
-            <label><input type="checkbox" id="fSSR" checked /> SSR</label>
-            <label><input type="checkbox" id="fSR" checked /> SR</label>
-            <label><input type="checkbox" id="fR" checked /> R</label>
-
-            <div style="flex: 1 1 220px"></div>
-
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2x"> 2&times; speed</label>
-<button class="btn primary" id="rollBtn" type="button">
-              Roll 5
-            </button>
-            <button class="btn" id="clearExBtn" type="button">
-              Clear Exclusions
-            </button>
-          </div>
-
-          <div class="toolbar" role="group" aria-label="Exclude cards">
-            <input
-              list="supportList"
-              id="excludeInput"
-              placeholder="Exclude a support (choose from list)"
-            />
-            <datalist id="supportList"></datalist>
-            <button class="btn" id="addExBtn" type="button">
-              Add to Exclusions
-            </button>
-          </div>
-
-          <div id="excludeChips" class="chips" aria-live="polite"></div>
+      <div class="planner-toolbar card card-elevated">
+        <div class="planner-scenario-toggle">
+          <button class="btn active" id="scenarioURA" data-scenario="ura">URA Finals</button>
+          <button class="btn" id="scenarioAoharu" data-scenario="aoharu">Aoharu Cup</button>
         </div>
+        <div class="planner-actions">
+          <button class="btn btn-secondary" id="plannerSave">Save</button>
+          <button class="btn btn-secondary" id="plannerLoad">Load</button>
+          <button class="btn btn-secondary" id="plannerExport">Export</button>
+          <button class="btn" id="plannerClear">Clear</button>
+        </div>
+      </div>
 
-        <div id="deckResults" class="grid" aria-live="polite"></div>
-      </section>
+      <div class="planner-palette card card-elevated">
+        <span class="planner-palette-label muted">Activity:</span>
+        <button class="palette-btn active" data-activity="speed" style="--act-color:#3b82f6">Speed</button>
+        <button class="palette-btn" data-activity="stamina" style="--act-color:#f97316">Stamina</button>
+        <button class="palette-btn" data-activity="power" style="--act-color:#ef4444">Power</button>
+        <button class="palette-btn" data-activity="guts" style="--act-color:#eab308">Guts</button>
+        <button class="palette-btn" data-activity="wisdom" style="--act-color:#22c55e">Wisdom</button>
+        <button class="palette-btn" data-activity="race" style="--act-color:#a855f7">Race</button>
+        <button class="palette-btn" data-activity="rest" style="--act-color:#6b7280">Rest</button>
+        <button class="palette-btn" data-activity="outing" style="--act-color:#ec4899">Outing</button>
+        <button class="palette-btn" data-activity="empty" style="--act-color:#cbd5e0">Clear</button>
+      </div>
 
-      <div class="spacer"></div>
-
-      <!-- Uma Randomizer -->
-      <section id="umaRandomizer" class="result">
-        <div class="choice">
-          <h3>Random Uma</h3>
-          <div class="toolbar">
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2xUma"> 2&times; speed</label>
-<button class="btn primary" id="pickUmaBtn" type="button">
-              Pick Random Uma
-            </button>
+      <div id="aoharu-panel" class="card card-elevated aoharu-panel" style="display:none">
+        <h3>Aoharu Cup Settings</h3>
+        <div class="aoharu-controls">
+          <div class="kv-row">
+            <div class="k">Team Focus</div>
+            <div class="v">
+              <select id="aoharuTeam">
+                <option value="blue">Blue (Speed)</option>
+                <option value="green">Green (Stamina)</option>
+                <option value="yellow">Yellow (Power)</option>
+              </select>
+            </div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Explosions</div>
+            <div class="v aoharu-counter">
+              <button class="btn" id="aoharuExpDown">−</button>
+              <span id="aoharuExpCount">0</span>
+              <button class="btn" id="aoharuExpUp">+</button>
+            </div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Burst Active</div>
+            <div class="v">
+              <label class="target-check">
+                <input type="checkbox" id="aoharuBurst" />
+                Aoharu Burst
+              </label>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div id="umaResult" class="grid" aria-live="polite"></div>
+      <div id="planner-phases"></div>
+
+      <section class="card card-elevated planner-summary" id="planner-summary">
+        <h2>Summary</h2>
+        <div class="planner-stats" id="planner-stats"></div>
       </section>
     </main>
 
-    
-    <script src="/js/random.js" defer></script>
-        <script>
+    <script src="/js/planner.js" defer></script>
+    <script>
       window.NAV_ROUTES = [
   { label: "Optimizer", path: "/optimizer", file: "/optimizer.html" },
   { label: "Calculator", path: "/calculator", file: "/calculator.html" },
@@ -313,6 +270,3 @@
     <script src="/js/theme-toggle.js" defer></script>
   </body>
 </html>
-
-
-

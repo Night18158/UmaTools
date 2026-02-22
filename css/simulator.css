@@ -1,0 +1,265 @@
+.sim-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sim-conditions,
+.sim-results-panel {
+  padding: 16px;
+}
+
+.sim-conditions h2,
+.sim-results-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+}
+
+.sim-stat-inputs {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.sim-stat-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--surface-2, #f7fafc);
+}
+
+.sim-stat-inputs input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e0);
+  background: var(--surface-1, #fff);
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.sim-conditions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sim-cond-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--surface-2, #f7fafc);
+}
+
+.sim-cond-label select,
+.sim-cond-label input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e0);
+  background: var(--surface-1, #fff);
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.sim-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sim-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sim-type-btn {
+  border: 2px solid var(--t-color, #cbd5e0);
+  background: transparent;
+  color: var(--t-color, #374151);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sim-type-btn:hover,
+.sim-type-btn.active {
+  background: var(--t-color, #374151);
+  color: #fff;
+}
+
+.sim-result {
+  margin-bottom: 16px;
+}
+
+.sim-total-gain {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sim-total-gain span {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sim-gains-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sim-gain-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-2, #f7fafc);
+}
+
+.sim-gain-val {
+  font-weight: 700;
+}
+
+.sim-breakdown {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 10px;
+  margin-top: 8px;
+}
+
+.sim-bd-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sim-bd-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 2px 0;
+}
+
+.sim-bd-val {
+  font-weight: 700;
+}
+
+.sim-failure {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.sim-failure h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.sim-failure-bar-wrap {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.sim-failure-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s, background 0.3s;
+}
+
+.sim-failure-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sim-compare-section {
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.sim-compare-section h2 {
+  margin: 0 0 12px;
+}
+
+.sim-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.sim-compare-card {
+  border: 2px solid var(--t-color, #cbd5e0);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  background: var(--surface-2, #f7fafc);
+}
+
+.sim-compare-card.active {
+  background: color-mix(in srgb, var(--t-color, #3182ce) 12%, transparent);
+}
+
+.sim-compare-type {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+  color: var(--text-2, #374151);
+}
+
+.sim-compare-val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.sim-compare-gains {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-2, #6b7280);
+}
+
+@media (max-width: 900px) {
+  .sim-grid {
+    grid-template-columns: 1fr;
+  }
+  .sim-compare-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sim-compare-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
