@@ -10,6 +10,7 @@
     { label: "Planner", path: "/planner", file: "/planner.html" },
     { label: "Races", path: "/races", file: "/races.html" },
     { label: "Simulator", path: "/simulator", file: "/simulator.html" },
+    { label: "Deck Builder", path: "/deck", file: "/deck.html" },
   ];
   const ROUTES =
     Array.isArray(window.NAV_ROUTES) && window.NAV_ROUTES.length
