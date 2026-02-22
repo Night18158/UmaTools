@@ -191,6 +191,10 @@
     // Search input value
     const input = el.querySelector(".slot-input");
     if (!hasCd && input) input.value = "";
+
+    // Empty hint visibility
+    const emptyHint = el.querySelector(".slot-empty-hint");
+    if (emptyHint) emptyHint.style.display = hasCd ? "none" : "";
   }
 
   // ── Build DOM for all slots ─────────────────────────────────
@@ -403,7 +407,7 @@
         if (i >= SLOT_COUNT) return;
         slots[i].lb = Number(entry.lb) || 0;
         slots[i].type = TYPE_LABELS.includes(entry.type) ? entry.type : "speed";
-        if (entry.id != null) {
+        if (entry.id !== null && entry.id !== undefined) {
           const found = allCards.find((c) => String(c.id) === String(entry.id));
           if (found) { slots[i].card = found; loaded = true; }
         }
@@ -453,7 +457,15 @@
       btn.textContent = "Copied!";
       setTimeout(() => (btn.textContent = orig), 1400);
     } catch (_) {
-      prompt("Copy this link:", location.origin + location.pathname + encodeHash());
+      const shareUrl = location.origin + location.pathname + encodeHash();
+      const inp = document.createElement("input");
+      inp.value = shareUrl;
+      inp.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(inp);
+      inp.select();
+      try { document.execCommand("copy"); } catch (_) {}
+      document.body.removeChild(inp);
+      alert("Link copied to clipboard:\n" + shareUrl);
     }
   });
 
