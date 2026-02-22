@@ -7,6 +7,9 @@
     { label: "Support Hints", path: "/hints", file: "/hints.html" },
     { label: "Randomizer", path: "/random", file: "/random.html" },
     { label: "Umadle", path: "/umadle", file: "/umadle.html" },
+    { label: "Planner", path: "/planner", file: "/planner.html" },
+    { label: "Races", path: "/races", file: "/races.html" },
+    { label: "Simulator", path: "/simulator", file: "/simulator.html" },
   ];
   const ROUTES =
     Array.isArray(window.NAV_ROUTES) && window.NAV_ROUTES.length

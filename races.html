@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UmaTools - Randomizer</title>
+    <title>UmaTools - Target Races</title>
     <meta
       name="description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Check target race schedules and stat requirements by distance specialty for Umamusume."
     />
-    <link rel="canonical" href="https://daftuyda.moe/random" />
+    <link rel="canonical" href="https://daftuyda.moe/races" />
     <meta name="robots" content="index, follow" />
     <meta
       name="theme-color"
@@ -24,12 +24,15 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="UmaTools" />
-    <meta property="og:title" content="UmaTools - Randomizer" />
+    <meta property="og:title" content="UmaTools - Target Races" />
     <meta
       property="og:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Check target race schedules and stat requirements by distance specialty for Umamusume."
     />
-    <meta property="og:url" content="https://daftuyda.moe/random" />
+    <meta
+      property="og:url"
+      content="https://daftuyda.moe/races"
+    />
     <meta
       property="og:image"
       content="https://daftuyda.moe/og-default.png"
@@ -37,12 +40,12 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="UmaTools - Randomizer" />
+    <meta property="og:image:alt" content="UmaTools - Target Races" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="UmaTools - Randomizer" />
+    <meta name="twitter:title" content="UmaTools - Target Races" />
     <meta
       name="twitter:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Check target race schedules and stat requirements by distance specialty for Umamusume."
     />
     <meta
       name="twitter:image"
@@ -50,7 +53,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="UmaTools - Randomizer"
+      content="UmaTools - Target Races"
     />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link
@@ -79,64 +82,8 @@
     />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/theme-d.build.css" />
-    <link rel="stylesheet" href="/css/random.css" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://daftuyda.moe/#organization",
-            "name": "UmaTools",
-            "url": "https://daftuyda.moe/",
-            "logo": "https://daftuyda.moe/icon-512.png",
-            "sameAs": [
-              "https://github.com/daftuyda/UmaTools",
-              "https://youtube.com/@MaybeVoid"
-            ]
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://daftuyda.moe/#website",
-            "url": "https://daftuyda.moe/",
-            "name": "UmaTools",
-            "publisher": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "WebPage",
-            "@id": "https://daftuyda.moe/random#webpage",
-            "url": "https://daftuyda.moe/random",
-            "name": "Randomizer",
-            "description": "Roll random support decks and pick random Uma Musume with filters and speed options.",
-            "isPartOf": { "@id": "https://daftuyda.moe/#website" },
-            "about": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "BreadcrumbList",
-            "@id": "https://daftuyda.moe/random#breadcrumb",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://daftuyda.moe/"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Randomizer",
-                "item": "https://daftuyda.moe/random"
-              }
-            ]
-          }
-        ]
-      }
-    </script>
-    <!-- No-flash dark mode: pre-apply saved theme before paint -->
-    
-      <script defer src="/_vercel/insights/script.js"></script>
+    <link rel="stylesheet" href="/css/races.css" />
+    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
     <script>
@@ -234,67 +181,81 @@
     </button>
 
     <main id="main" class="container">
-      <h1>Randomizer</h1>
+      <h1>Target Races</h1>
 
-      <!-- Support Deck Randomizer -->
-      <section id="supportRandomizer" class="result">
-        <div class="choice">
-          <h3>Support Deck (5 cards)</h3>
-          <div class="toolbar" role="group" aria-label="Support filters">
-            <label><input type="checkbox" id="fSSR" checked /> SSR</label>
-            <label><input type="checkbox" id="fSR" checked /> SR</label>
-            <label><input type="checkbox" id="fR" checked /> R</label>
-
-            <div style="flex: 1 1 220px"></div>
-
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2x"> 2&times; speed</label>
-<button class="btn primary" id="rollBtn" type="button">
-              Roll 5
-            </button>
-            <button class="btn" id="clearExBtn" type="button">
-              Clear Exclusions
-            </button>
-          </div>
-
-          <div class="toolbar" role="group" aria-label="Exclude cards">
-            <input
-              list="supportList"
-              id="excludeInput"
-              placeholder="Exclude a support (choose from list)"
-            />
-            <datalist id="supportList"></datalist>
-            <button class="btn" id="addExBtn" type="button">
-              Add to Exclusions
-            </button>
-          </div>
-
-          <div id="excludeChips" class="chips" aria-live="polite"></div>
+      <section class="card card-elevated races-preset-section">
+        <div class="races-preset-header">
+          <h2>Distance Specialty</h2>
+          <p class="muted">Select your character's distance specialty to load a typical race schedule.</p>
         </div>
-
-        <div id="deckResults" class="grid" aria-live="polite"></div>
+        <div class="races-preset-buttons">
+          <button class="btn active" data-preset="sprinter">Sprinter (1000–1400m)</button>
+          <button class="btn" data-preset="miler">Miler (1400–1800m)</button>
+          <button class="btn" data-preset="medium">Medium (1800–2400m)</button>
+          <button class="btn" data-preset="long">Long (2400m+)</button>
+        </div>
       </section>
 
-      <div class="spacer"></div>
-
-      <!-- Uma Randomizer -->
-      <section id="umaRandomizer" class="result">
-        <div class="choice">
-          <h3>Random Uma</h3>
-          <div class="toolbar">
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2xUma"> 2&times; speed</label>
-<button class="btn primary" id="pickUmaBtn" type="button">
-              Pick Random Uma
-            </button>
-          </div>
+      <section class="card card-elevated races-fan-section">
+        <h2>Fan Milestone Tracker</h2>
+        <div class="races-fan-row">
+          <label>Current Fans
+            <input type="number" id="fanCount" min="0" max="999999" value="0" />
+          </label>
+          <div class="races-fan-milestones" id="fanMilestones"></div>
         </div>
+      </section>
 
-        <div id="umaResult" class="grid" aria-live="polite"></div>
+      <section class="card card-elevated races-stats-section">
+        <h2>Recommended Stats</h2>
+        <p class="muted" id="statsPresetLabel">Showing recommendations for Sprinter.</p>
+        <div class="races-stat-inputs" id="statInputs"></div>
+      </section>
+
+      <section class="card card-elevated races-schedule-section">
+        <h2>Race Schedule</h2>
+        <div class="races-table-wrapper">
+          <table class="races-table" id="racesTable">
+            <thead>
+              <tr>
+                <th>Turn</th>
+                <th>Race</th>
+                <th>Distance</th>
+                <th>Surface</th>
+                <th>Grade</th>
+                <th>Placement</th>
+                <th>Phase</th>
+              </tr>
+            </thead>
+            <tbody id="racesBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card card-elevated races-links-section">
+        <h2>Quick Links</h2>
+        <div class="races-quicklinks">
+          <a class="btn primary" href="/stamina">Stamina Check</a>
+          <a class="btn primary" href="/optimizer">Skill Optimizer</a>
+          <a class="btn primary" href="/simulator">Stat Simulator</a>
+        </div>
+      </section>
+
+      <section class="card card-elevated races-notes-section">
+        <button class="btn btn-secondary races-notes-toggle" id="notesToggle" aria-expanded="false">
+          ▶ Scenario Notes (URA Finals vs Aoharu Cup)
+        </button>
+        <div class="races-notes-content" id="notesContent" style="display:none">
+          <h3>URA Finals</h3>
+          <p>Three selection races and a finals race. You must place well in each to qualify. Focus on your target distance from the start, and ensure fans goals are met to unlock later races.</p>
+          <h3>Aoharu Cup</h3>
+          <p>Team-based training with shared races. You must win races with the full team. Aoharu Explosions boost stats significantly — plan around burst windows. Race requirements are similar but team performance matters.</p>
+        </div>
       </section>
     </main>
 
-    
-    <script src="/js/random.js" defer></script>
-        <script>
+    <script src="/js/races.js" defer></script>
+    <script>
       window.NAV_ROUTES = [
   { label: "Optimizer", path: "/optimizer", file: "/optimizer.html" },
   { label: "Calculator", path: "/calculator", file: "/calculator.html" },
@@ -313,6 +274,3 @@
     <script src="/js/theme-toggle.js" defer></script>
   </body>
 </html>
-
-
-

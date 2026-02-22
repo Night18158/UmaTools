@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UmaTools - Randomizer</title>
+    <title>UmaTools - Stat Simulator</title>
     <meta
       name="description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Simulate Uma Musume training stat gains based on conditions, support cards, and motivation."
     />
-    <link rel="canonical" href="https://daftuyda.moe/random" />
+    <link rel="canonical" href="https://daftuyda.moe/simulator" />
     <meta name="robots" content="index, follow" />
     <meta
       name="theme-color"
@@ -24,12 +24,15 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="UmaTools" />
-    <meta property="og:title" content="UmaTools - Randomizer" />
+    <meta property="og:title" content="UmaTools - Stat Simulator" />
     <meta
       property="og:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Simulate Uma Musume training stat gains based on conditions, support cards, and motivation."
     />
-    <meta property="og:url" content="https://daftuyda.moe/random" />
+    <meta
+      property="og:url"
+      content="https://daftuyda.moe/simulator"
+    />
     <meta
       property="og:image"
       content="https://daftuyda.moe/og-default.png"
@@ -37,12 +40,12 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="UmaTools - Randomizer" />
+    <meta property="og:image:alt" content="UmaTools - Stat Simulator" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="UmaTools - Randomizer" />
+    <meta name="twitter:title" content="UmaTools - Stat Simulator" />
     <meta
       name="twitter:description"
-      content="Roll random support decks and pick random Uma Musume with filters and speed options."
+      content="Simulate Uma Musume training stat gains based on conditions, support cards, and motivation."
     />
     <meta
       name="twitter:image"
@@ -50,7 +53,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="UmaTools - Randomizer"
+      content="UmaTools - Stat Simulator"
     />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link
@@ -79,64 +82,8 @@
     />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/theme-d.build.css" />
-    <link rel="stylesheet" href="/css/random.css" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://daftuyda.moe/#organization",
-            "name": "UmaTools",
-            "url": "https://daftuyda.moe/",
-            "logo": "https://daftuyda.moe/icon-512.png",
-            "sameAs": [
-              "https://github.com/daftuyda/UmaTools",
-              "https://youtube.com/@MaybeVoid"
-            ]
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://daftuyda.moe/#website",
-            "url": "https://daftuyda.moe/",
-            "name": "UmaTools",
-            "publisher": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "WebPage",
-            "@id": "https://daftuyda.moe/random#webpage",
-            "url": "https://daftuyda.moe/random",
-            "name": "Randomizer",
-            "description": "Roll random support decks and pick random Uma Musume with filters and speed options.",
-            "isPartOf": { "@id": "https://daftuyda.moe/#website" },
-            "about": { "@id": "https://daftuyda.moe/#organization" },
-            "inLanguage": "en"
-          },
-          {
-            "@type": "BreadcrumbList",
-            "@id": "https://daftuyda.moe/random#breadcrumb",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://daftuyda.moe/"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Randomizer",
-                "item": "https://daftuyda.moe/random"
-              }
-            ]
-          }
-        ]
-      }
-    </script>
-    <!-- No-flash dark mode: pre-apply saved theme before paint -->
-    
-      <script defer src="/_vercel/insights/script.js"></script>
+    <link rel="stylesheet" href="/css/simulator.css" />
+    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
     <script>
@@ -234,67 +181,92 @@
     </button>
 
     <main id="main" class="container">
-      <h1>Randomizer</h1>
+      <h1>Stat Simulator</h1>
 
-      <!-- Support Deck Randomizer -->
-      <section id="supportRandomizer" class="result">
-        <div class="choice">
-          <h3>Support Deck (5 cards)</h3>
-          <div class="toolbar" role="group" aria-label="Support filters">
-            <label><input type="checkbox" id="fSSR" checked /> SSR</label>
-            <label><input type="checkbox" id="fSR" checked /> SR</label>
-            <label><input type="checkbox" id="fR" checked /> R</label>
-
-            <div style="flex: 1 1 220px"></div>
-
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2x"> 2&times; speed</label>
-<button class="btn primary" id="rollBtn" type="button">
-              Roll 5
-            </button>
-            <button class="btn" id="clearExBtn" type="button">
-              Clear Exclusions
-            </button>
+      <div class="sim-grid">
+        <section class="card card-elevated sim-conditions">
+          <h2>Current Stats</h2>
+          <div class="rating-grid sim-stat-inputs" id="simStatInputs">
+            <label>Speed <input type="number" id="simSpeed" min="0" max="2000" value="600" /></label>
+            <label>Stamina <input type="number" id="simStamina" min="0" max="2000" value="400" /></label>
+            <label>Power <input type="number" id="simPower" min="0" max="2000" value="500" /></label>
+            <label>Guts <input type="number" id="simGuts" min="0" max="2000" value="300" /></label>
+            <label>Wisdom <input type="number" id="simWisdom" min="0" max="2000" value="400" /></label>
           </div>
 
-          <div class="toolbar" role="group" aria-label="Exclude cards">
-            <input
-              list="supportList"
-              id="excludeInput"
-              placeholder="Exclude a support (choose from list)"
-            />
-            <datalist id="supportList"></datalist>
-            <button class="btn" id="addExBtn" type="button">
-              Add to Exclusions
-            </button>
+          <h2 style="margin-top:16px">Training Conditions</h2>
+          <div class="sim-conditions-grid">
+            <label class="sim-cond-label">Motivation
+              <select id="simMotivation">
+                <option value="1.2">Great (+20%)</option>
+                <option value="1.1">Good (+10%)</option>
+                <option value="1.0" selected>Normal (0%)</option>
+                <option value="0.9">Bad (−10%)</option>
+                <option value="0.8">Awful (−20%)</option>
+              </select>
+            </label>
+            <label class="sim-cond-label">Training Level
+              <select id="simLevel">
+                <option value="1" selected>Level 1</option>
+                <option value="2">Level 2</option>
+                <option value="3">Level 3</option>
+                <option value="4">Level 4</option>
+                <option value="5">Level 5</option>
+              </select>
+            </label>
+            <label class="sim-cond-label">Support Cards Present
+              <input type="number" id="simSupportCards" min="0" max="6" value="1" />
+            </label>
+            <label class="sim-cond-label">Energy (%)
+              <input type="number" id="simEnergy" min="0" max="100" value="80" />
+            </label>
+          </div>
+          <div class="sim-checkboxes">
+            <label class="target-check">
+              <input type="checkbox" id="simFriendship" />
+              Friendship training active
+            </label>
+            <label class="target-check">
+              <input type="checkbox" id="simAoharu" />
+              Aoharu training
+            </label>
+            <label class="target-check">
+              <input type="checkbox" id="simExplosion" />
+              Aoharu Explosion
+            </label>
+          </div>
+        </section>
+
+        <section class="card card-elevated sim-results-panel">
+          <h2>Training Type</h2>
+          <div class="sim-type-buttons">
+            <button class="sim-type-btn active" data-type="speed" style="--t-color:#3b82f6">Speed</button>
+            <button class="sim-type-btn" data-type="stamina" style="--t-color:#f97316">Stamina</button>
+            <button class="sim-type-btn" data-type="power" style="--t-color:#ef4444">Power</button>
+            <button class="sim-type-btn" data-type="guts" style="--t-color:#eab308">Guts</button>
+            <button class="sim-type-btn" data-type="wisdom" style="--t-color:#22c55e">Wisdom</button>
           </div>
 
-          <div id="excludeChips" class="chips" aria-live="polite"></div>
-        </div>
+          <div class="sim-result" id="simResult"></div>
 
-        <div id="deckResults" class="grid" aria-live="polite"></div>
-      </section>
-
-      <div class="spacer"></div>
-
-      <!-- Uma Randomizer -->
-      <section id="umaRandomizer" class="result">
-        <div class="choice">
-          <h3>Random Uma</h3>
-          <div class="toolbar">
-            <label class="toggle" style="margin-right:.75rem"><input type="checkbox" id="speed2xUma"> 2&times; speed</label>
-<button class="btn primary" id="pickUmaBtn" type="button">
-              Pick Random Uma
-            </button>
+          <div class="sim-failure">
+            <h3>Failure Risk</h3>
+            <div class="sim-failure-bar-wrap">
+              <div class="sim-failure-bar" id="simFailureBar"></div>
+            </div>
+            <div id="simFailureText" class="sim-failure-text"></div>
           </div>
-        </div>
+        </section>
+      </div>
 
-        <div id="umaResult" class="grid" aria-live="polite"></div>
+      <section class="card card-elevated sim-compare-section">
+        <h2>Compare All Training Types</h2>
+        <div class="sim-compare-grid" id="simCompareGrid"></div>
       </section>
     </main>
 
-    
-    <script src="/js/random.js" defer></script>
-        <script>
+    <script src="/js/simulator.js" defer></script>
+    <script>
       window.NAV_ROUTES = [
   { label: "Optimizer", path: "/optimizer", file: "/optimizer.html" },
   { label: "Calculator", path: "/calculator", file: "/calculator.html" },
@@ -313,6 +285,3 @@
     <script src="/js/theme-toggle.js" defer></script>
   </body>
 </html>
-
-
-
