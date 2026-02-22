@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UmaTools - Uma Musume Training Toolkit</title>
+    <title>UmaTools - Deck Builder</title>
     <meta
       name="description"
-      content="UmaTools is a fast Uma Musume toolkit with Event OCR, support hint search, skill optimizer, rating calculator, randomizer, and Umadle."
+      content="Build your 6-card support deck and compare limit break stat bonuses."
     />
-    <link rel="canonical" href="https://daftuyda.moe/" />
+    <link rel="canonical" href="https://daftuyda.moe/deck" />
     <meta name="robots" content="index, follow" />
     <meta
       name="theme-color"
@@ -24,15 +24,12 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="UmaTools" />
-    <meta
-      property="og:title"
-      content="UmaTools - Uma Musume Training Toolkit"
-    />
+    <meta property="og:title" content="UmaTools - Deck Builder" />
     <meta
       property="og:description"
-      content="UmaTools is a fast Uma Musume toolkit with Event OCR, support hint search, skill optimizer, rating calculator, randomizer, and Umadle."
+      content="Build your 6-card support deck and compare limit break stat bonuses."
     />
-    <meta property="og:url" content="https://daftuyda.moe/" />
+    <meta property="og:url" content="https://daftuyda.moe/deck" />
     <meta
       property="og:image"
       content="https://daftuyda.moe/og-default.png"
@@ -42,16 +39,13 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="UmaTools - Uma Musume Training Toolkit"
+      content="UmaTools - Deck Builder"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="UmaTools - Uma Musume Training Toolkit"
-    />
+    <meta name="twitter:title" content="UmaTools - Deck Builder" />
     <meta
       name="twitter:description"
-      content="UmaTools is a fast Uma Musume toolkit with Event OCR, support hint search, skill optimizer, rating calculator, randomizer, and Umadle."
+      content="Build your 6-card support deck and compare limit break stat bonuses."
     />
     <meta
       name="twitter:image"
@@ -59,7 +53,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="UmaTools - Uma Musume Training Toolkit"
+      content="UmaTools - Deck Builder"
     />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link
@@ -88,6 +82,7 @@
     />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/theme-d.build.css" />
+    <link rel="stylesheet" href="/css/deck.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -113,13 +108,31 @@
           },
           {
             "@type": "WebPage",
-            "@id": "https://daftuyda.moe/#webpage",
-            "url": "https://daftuyda.moe/",
-            "name": "UmaTools - Uma Musume Training Toolkit",
-            "description": "UmaTools is a fast Uma Musume toolkit with Event OCR, support hint search, skill optimizer, rating calculator, randomizer, and Umadle.",
+            "@id": "https://daftuyda.moe/deck#webpage",
+            "url": "https://daftuyda.moe/deck",
+            "name": "Deck Builder",
+            "description": "Build your 6-card support deck and compare limit break stat bonuses.",
             "isPartOf": { "@id": "https://daftuyda.moe/#website" },
             "about": { "@id": "https://daftuyda.moe/#organization" },
             "inLanguage": "en"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://daftuyda.moe/deck#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://daftuyda.moe/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Deck Builder",
+                "item": "https://daftuyda.moe/deck"
+              }
+            ]
           }
         ]
       }
@@ -176,10 +189,9 @@
         } catch (e) {}
       })();
     </script>
-    
 
     <main id="main" class="container">
-      <h1>Most visited tools</h1>
+      <h1>Deck Builder</h1>
 
       <button
         id="modeToggleBtn"
@@ -227,111 +239,53 @@
       </button>
 
       <p class="subtle">
-        Based on recent traffic, here are the pages players open the most.
+        Build your 6-card support deck, set each card's limit break level, and
+        see combined stat bonuses at a glance.
       </p>
 
-      <div class="grid">
+      <datalist id="cardList"></datalist>
 
-        <div class="card tool-card">
-          <h3>Skill Optimizer</h3>
-          <p class="muted">
-            Plan skill builds and check synergy with target races.
-          </p>
-          <div class="badges">
-            <span class="badge">Build planner</span>
-          </div>
-          <a class="btn primary" href="/optimizer">Open Optimizer</a>
-        </div>
+      <div class="deck-actions">
+        <button id="btn-share" class="btn">Share Deck</button>
+        <button id="btn-export" class="btn">Export as Text</button>
+        <button id="btn-clear" class="btn">Clear Deck</button>
+      </div>
 
-        <div class="card tool-card">
-          <h3>Rating Calculator</h3>
-          <p class="muted">Estimate rating points with a live stat breakdown.</p>
-          <div class="badges">
-            <span class="badge">Stats calculator</span>
-          </div>
-          <a class="btn primary" href="/calculator">Open Calculator</a>
-        </div>
+      <div id="deck-grid" class="deck-grid"></div>
 
-        <div class="card tool-card">
-          <h3>Stamina Check</h3>
-          <p class="muted">See if your stamina meets distance and style thresholds.</p>
-          <div class="badges">
-            <span class="badge">Stamina guide</span>
-          </div>
-          <a class="btn primary" href="/stamina">Open Stamina Check</a>
-        </div>
+      <!-- Summary panel -->
+      <div class="deck-summary">
+        <h2>Combined Stat Bonuses</h2>
+        <div id="stat-bars" class="stat-bars"></div>
+        <div id="deck-meta" class="deck-meta-row"></div>
+      </div>
 
-        <div class="card tool-card">
-          <h3>Event OCR</h3>
-          <p class="muted">Capture event screens and search outcomes instantly.</p>
-          <div class="badges">
-            <span class="badge">OCR search</span>
-          </div>
-          <a class="btn primary" href="/events">Open Event OCR</a>
-        </div>
+      <!-- Combined hints (shown when all 6 slots filled) -->
+      <div id="combined-hints-section" class="combined-hints" style="display:none">
+        <h3>Combined Hint Skills</h3>
+        <div id="combined-hints-list" class="combined-hints-list"></div>
+      </div>
 
-        <div class="card tool-card">
-          <h3>Support Hints</h3>
-          <p class="muted">
-            Find support cards by hint keywords and rarity filters.
-          </p>
-          <div class="badges">
-            <span class="badge">Hint finder</span>
-          </div>
-          <a class="btn primary" href="/hints">Open Support Hints</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Randomizer</h3>
-          <p class="muted">
-            Spin up randomized challenges or inspiration runs.
-          </p>
-          <div class="badges">
-            <span class="badge">Fun mode</span>
-          </div>
-          <a class="btn primary" href="/random">Open Randomizer</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Umadle</h3>
-          <p class="muted">Daily guessing game with Uma Musume data.</p>
-          <div class="badges">
-            <span class="badge">Daily challenge</span>
-          </div>
-          <a class="btn primary" href="/umadle">Open Umadle</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Training Planner</h3>
-          <p class="muted">Plan your 78-turn training run with a visual timeline.</p>
-          <div class="badges"><span class="badge">Turn tracker</span></div>
-          <a class="btn primary" href="/planner">Open Planner</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Target Races</h3>
-          <p class="muted">Check target race schedules and stat requirements by distance.</p>
-          <div class="badges"><span class="badge">Race guide</span></div>
-          <a class="btn primary" href="/races">Open Races</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Stat Simulator</h3>
-          <p class="muted">Simulate training gains based on conditions and support cards.</p>
-          <div class="badges"><span class="badge">Stat calculator</span></div>
-          <a class="btn primary" href="/simulator">Open Simulator</a>
-        </div>
-
-        <div class="card tool-card">
-          <h3>Deck Builder</h3>
-          <p class="muted">Build your 6-card support deck and compare limit break stat bonuses.</p>
-          <div class="badges">
-            <span class="badge">Deck planner</span>
-          </div>
-          <a class="btn primary" href="/deck">Open Deck Builder</a>
+      <!-- LB comparison table -->
+      <div id="lb-compare-section" class="lb-compare-section" style="display:none">
+        <h3>Limit Break Comparison</h3>
+        <div style="overflow-x:auto">
+          <table class="lb-compare-table">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th>LB0</th>
+                <th>Current LB</th>
+                <th>MLB</th>
+              </tr>
+            </thead>
+            <tbody id="lb-compare-body"></tbody>
+          </table>
         </div>
       </div>
     </main>
+
+    <script src="/js/deck.js" defer></script>
     <script>
       window.NAV_ROUTES = [
   { label: "Optimizer", path: "/optimizer", file: "/optimizer.html" },

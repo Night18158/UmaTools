@@ -1,0 +1,401 @@
+/* ── Deck Builder ──────────────────────────────────────── */
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+@media (max-width: 900px) {
+  .deck-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .deck-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Slot card */
+.slot-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-1);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.slot-card.has-card {
+  border-color: var(--primary, #3b82f6);
+}
+
+.slot-card.duplicate-warn {
+  border-color: #f59e0b;
+  background: rgb(245 158 11 / 0.06);
+}
+
+.slot-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Search row */
+.slot-search-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.slot-search-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Card preview */
+.slot-preview {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.slot-card.has-card .slot-preview {
+  display: flex;
+}
+
+.slot-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+
+.slot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slot-thumb-initials {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-1);
+  text-align: center;
+}
+
+.slot-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.slot-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-1);
+}
+
+.slot-rarity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  flex-wrap: wrap;
+}
+
+.slot-remove {
+  flex-shrink: 0;
+  padding: 0.2rem 0.4rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.slot-remove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Card type selector */
+.slot-type-row {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.type-btn {
+  padding: 0.18rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.type-btn.active {
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  border-color: var(--primary, #3b82f6);
+}
+
+/* LB selector */
+.slot-lb-row {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.lb-btn {
+  flex: 1;
+  padding: 0.22rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.lb-btn.active {
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  border-color: var(--primary, #3b82f6);
+}
+
+/* Per-card stat pills */
+.slot-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-height: 1.4rem;
+}
+
+.stat-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.12rem 0.4rem;
+  border-radius: 5px;
+  color: #fff;
+}
+
+.stat-pill.spd { background: #3b82f6; }
+.stat-pill.sta { background: #f59e0b; }
+.stat-pill.pow { background: #ef4444; }
+.stat-pill.gut { background: #eab308; color: #1a1a1a; }
+.stat-pill.wis { background: #22c55e; }
+
+/* Hint skills collapsible */
+.slot-hints-toggle {
+  font-size: 0.8rem;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  user-select: none;
+}
+
+.slot-hints-toggle .arrow {
+  transition: transform 0.15s;
+  font-size: 0.7rem;
+}
+
+.slot-hints-toggle.open .arrow {
+  transform: rotate(90deg);
+}
+
+.slot-hints-list {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.25rem;
+}
+
+.slot-hints-list.open {
+  display: flex;
+}
+
+.dup-warning {
+  font-size: 0.75rem;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* ── Summary panel ───────────────────────────────────── */
+
+.deck-summary {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-1);
+  padding: 1rem 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.deck-summary h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.stat-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+
+.stat-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.stat-bar-label {
+  width: 4.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.stat-bar-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--surface-3, #e5e7eb);
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.25s;
+}
+
+.stat-bar-value {
+  width: 2.5rem;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-1);
+  flex-shrink: 0;
+}
+
+.deck-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  margin-bottom: 0.75rem;
+}
+
+.deck-meta-row strong {
+  color: var(--text-1);
+}
+
+/* ── Combined Hints ───────────────────────────────────── */
+
+.combined-hints {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-1);
+  padding: 0.85rem 1.1rem;
+  margin-top: 0.75rem;
+}
+
+.combined-hints h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.combined-hints-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* ── LB Comparison ───────────────────────────────────── */
+
+.lb-compare-section {
+  margin-top: 0.75rem;
+}
+
+.lb-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.lb-compare-table th,
+.lb-compare-table td {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.lb-compare-table th {
+  background: var(--surface-2);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.lb-compare-table td.card-name {
+  text-align: left;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.lb-compare-table tr:nth-child(even) td {
+  background: rgb(var(--surface-2-rgb, 243 244 246) / 0.4);
+}
+
+/* ── Action buttons row ────────────────────────────────── */
+
+.deck-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+/* ── Empty slot placeholder ────────────────────────────── */
+
+.slot-empty-hint {
+  font-size: 0.8rem;
+  color: var(--text-2);
+  opacity: 0.6;
+  text-align: center;
+  padding: 0.25rem 0;
+}
